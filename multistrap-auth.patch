@@ -1,0 +1,13 @@
+This patch fixed --no-auth of multistrap.
+https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=908451
+--- /usr/sbin/multistrap	2022-06-24 08:38:14.404919035 +0000
++++ /tmp/multistrap	2022-06-24 08:51:19.321226204 +0000
+@@ -319,6 +319,8 @@
+ $config_str .= " -o Dir::Etc::Trusted=" . shellescape("${dir}${etcdir}trusted.gpg");
+ $config_str .= " -o Apt::Get::AllowUnauthenticated=true"
+ 	if (defined $noauth);
++$config_str .= " -o Acquire::AllowInsecureRepositories=yes"
++	if (defined $noauth);
+ $config_str .= " -o Apt::Get::Download-Only=true";
+ $config_str .= " -o Apt::Install-Recommends=false"
+ 	if (not defined $allow_recommends);
