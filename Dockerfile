@@ -18,7 +18,7 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt update && \
     DEBIAN_FRONTEND=noninteractive apt install -y \
-        devscripts build-essential clang lld nodejs cbindgen m4 git multistrap
+        devscripts build-essential clang lld nodejs cbindgen m4 git multistrap pkg-config
 
 # Prepare Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
