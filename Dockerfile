@@ -1,9 +1,9 @@
-FROM ubuntu:noble 
+FROM ubuntu:noble
 
 MAINTAINER CHEN Xuan
 
 ARG WORKSPACE=/workspace
-ARG FIREFOX_DIR=$WORKSPACE/firefox-131.0.2
+ARG FIREFOX_DIR=$WORKSPACE/firefox-137.0.2
 ARG SCRIPT_DIR=$WORKSPACE/eswin-scripts
 ARG SYSROOT_DIR=$WORKSPACE/sysroot
 
@@ -26,15 +26,18 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
     rustup target add riscv64gc-unknown-linux-gnu
 
 # Prepare sysroot
-RUN git clone --depth=1 https://github.com/rockos-riscv/cross-script-firefox $SCRIPT_DIR && \
+RUN git clone --depth=1 --branch=137-orig https://github.com/rockos-riscv/cross-script-firefox $SCRIPT_DIR && \
     patch -p0 /usr/sbin/multistrap $SCRIPT_DIR/multistrap-auth.patch && \
     multistrap -a riscv64 -d $SYSROOT_DIR -f $SCRIPT_DIR/sysroot-riscv64.conf
 
 # Get Firefox Source Code
-RUN dget -u https://fast-mirror.isrc.ac.cn/rockos/20250130/rockos-addons/pool/main/f/firefox/firefox_131.0.2-1rockos1.dsc
+RUN dget -u https://snapshot.debian.org/archive/debian/20250416T084123Z/pool/main/f/firefox/firefox_137.0.2-1.dsc
 
 # Create Mozconfig
 WORKDIR $FIREFOX_DIR
+## patchset
+RUN for i in $(ls $SCRIPT_DIR/patches); do patch -p1 < $SCRIPT_DIR/patches/$i; done
+## configuration
 RUN <<EOF cat >> mozconfig
 ac_add_options --enable-release
 ac_add_options --enable-default-toolkit=cairo-gtk3-wayland

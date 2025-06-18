@@ -1,0 +1,36 @@
+From 919d6670b25653fc3cbecc801f6b02eac24dde09 Mon Sep 17 00:00:00 2001
+From: Sakura286 <Sakura286>
+Date: Wed, 18 Jun 2025 03:51:13 +0000
+Subject: [PATCH 04/12] enlarge extra_hw_frames for h26x
+
+---
+ dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+index 6ddd9d4268..14653ac501 100644
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+@@ -1044,11 +1044,19 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWCodecContext(ContextType aType) {
+   }
+ 
+   if (mCodecID == AV_CODEC_ID_H264) {
++#if !defined(ES_MPP)
+     mCodecContext->extra_hw_frames =
+         H264::ComputeMaxRefFrames(mInfo.mExtraData);
++#else
++    mCodecContext->extra_hw_frames = 16;
++#endif
+   } else if (mCodecID == AV_CODEC_ID_HEVC) {
++#if !defined(ES_MPP)
+     mCodecContext->extra_hw_frames =
+         H265::ComputeMaxRefFrames(mInfo.mExtraData);
++#else
++    mCodecContext->extra_hw_frames = 16;
++#endif
+   } else {
+     mCodecContext->extra_hw_frames = EXTRA_HW_FRAMES;
+   }
+-- 
+2.43.0
+
