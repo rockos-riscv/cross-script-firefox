@@ -26,12 +26,12 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
     rustup target add riscv64gc-unknown-linux-gnu
 
 # Prepare sysroot
-RUN git clone --depth=1 https://github.com/rockos-riscv/cross-script-firefox $SCRIPT_DIR && \
+RUN git clone --depth=1 https://github.com/Sakura286/cross-script-firefox $SCRIPT_DIR && \
     patch -p0 /usr/sbin/multistrap $SCRIPT_DIR/multistrap-auth.patch && \
     multistrap -a riscv64 -d $SYSROOT_DIR -f $SCRIPT_DIR/sysroot-riscv64.conf
 
 # Get Firefox Source Code
-RUN dget -u https://fast-mirror.isrc.ac.cn/rockos/20250130/rockos-addons/pool/main/f/firefox/firefox_131.0.2-1rockos1.dsc
+RUN dget -u https://snapshot.debian.org/archive/debian/20250416T084123Z/pool/main/f/firefox/firefox_137.0.2-1.dsc
 
 # Create Mozconfig
 WORKDIR $FIREFOX_DIR
@@ -60,7 +60,7 @@ ac_add_options --with-sysroot=$SYSROOT_DIR
 EOF
 
 # Build & Package
-RUN ./mach configure
-RUN ./mach build -j$(nproc)
-RUN ./mach package
+# RUN ./mach configure
+# RUN ./mach build -j$(nproc)
+# RUN ./mach package
 # The target tarball path is obj-riscv64-unknown-linux-gnu/dist/firefox-131.0.2.en-US.linux-riscv64.tar.bz2
