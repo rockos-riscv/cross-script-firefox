@@ -1,0 +1,56 @@
+From c17eb90ac730429e8039ec091e6485d03078594f Mon Sep 17 00:00:00 2001
+From: CHEN Xuan <chenxuan@iscas.ac.cn>
+Date: Tue, 1 Jul 2025 10:49:07 +0000
+Subject: [PATCH 05/12] detect more vaapi decoder
+
+---
+ .../platforms/ffmpeg/FFmpegVideoDecoder.cpp   | 31 ++++++++++---------
+ 1 file changed, 16 insertions(+), 15 deletions(-)
+
+diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+index 14653ac501..ffbd2352c6 100644
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+@@ -239,23 +239,24 @@ static AVPixelFormat ChooseD3D11VAPixelFormat(AVCodecContext* aCodecContext,
+ 
+ #if defined(MOZ_USE_HWDECODE) && defined(MOZ_WIDGET_GTK)
+ AVCodec* FFmpegVideoDecoder<LIBAV_VER>::FindVAAPICodec() {
+-  AVCodec* decoder = FindHardwareAVCodec(mLib, mCodecID);
+-  if (!decoder) {
+-    FFMPEG_LOG("  We're missing hardware accelerated decoder");
+-    return nullptr;
+-  }
+-  for (int i = 0;; i++) {
+-    const AVCodecHWConfig* config = mLib->avcodec_get_hw_config(decoder, i);
+-    if (!config) {
+-      break;
+-    }
+-    if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+-        config->device_type == AV_HWDEVICE_TYPE_VAAPI) {
+-      return decoder;
++  void* opaque = nullptr;
++  while (AVCodec* codec = mLib->av_codec_iterate(&opaque)) {
++    // find decoder with specific mCodecID
++    if (codec->id != mCodecID || !mLib->av_codec_is_decoder(codec))
++      continue;
++    for (int i = 0;; i++) {
++      FFMPEG_LOG("Checking codec: %s", codec->name);
++      const AVCodecHWConfig* config = mLib->avcodec_get_hw_config(codec, i);
++      if (!config)
++        break;
++      if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
++          config->device_type == AV_HWDEVICE_TYPE_VAAPI) {
++        // find the first hardware decoder with vaapi and mCodecID
++        return codec;
++      }
+     }
+   }
+-
+-  FFMPEG_LOG("  HW Decoder does not support VAAPI device type");
++  FFMPEG_LOG("No VAAPI hardware decoder found");
+   return nullptr;
+ }
+ 
+-- 
+2.43.0
+

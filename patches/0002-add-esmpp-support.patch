@@ -1,0 +1,265 @@
+From 260fb0e66f16da0239e30d89136244bfbf7f8b32 Mon Sep 17 00:00:00 2001
+From: Sakura286 <Sakura286>
+Date: Wed, 18 Jun 2025 03:47:21 +0000
+Subject: [PATCH 02/12] add esmpp support
+
+---
+ .../platforms/ffmpeg/FFmpegVideoDecoder.cpp   | 130 +++++++++++++++++-
+ .../platforms/ffmpeg/FFmpegVideoDecoder.h     |   5 +
+ 2 files changed, 134 insertions(+), 1 deletion(-)
+
+diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+index 65a736fc48..6ddd9d4268 100644
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+@@ -22,6 +22,11 @@
+ #if LIBAVCODEC_VERSION_MAJOR >= 58
+ #  include "mozilla/ProfilerMarkers.h"
+ #endif
++#include <sys/mman.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <stdio.h>
++
+ #ifdef MOZ_USE_HWDECODE
+ #  include "H264.h"
+ #  include "H265.h"
+@@ -31,6 +36,7 @@
+ #  include "mozilla/layers/DMABUFSurfaceImage.h"
+ #  include "FFmpegVideoFramePool.h"
+ #  include "va/va.h"
++#define ES_MPP 1
+ #endif
+ 
+ #if defined(MOZ_AV1) && \
+@@ -52,6 +58,7 @@
+ #  define AV_PIX_FMT_GBRP10LE PIX_FMT_GBRP10LE
+ #  define AV_PIX_FMT_NONE PIX_FMT_NONE
+ #  define AV_PIX_FMT_VAAPI_VLD PIX_FMT_VAAPI_VLD
++#  define AV_PIX_FMT_NV12 PIX_FMT_NV12
+ #endif
+ #if LIBAVCODEC_VERSION_MAJOR > 58
+ #  define AV_PIX_FMT_VAAPI_VLD AV_PIX_FMT_VAAPI
+@@ -150,6 +157,8 @@ static AVPixelFormat ChoosePixelFormat(AVCodecContext* aCodecContext,
+       case AV_PIX_FMT_GBRP10LE:
+         FFMPEGV_LOG("Requesting pixel format GBRP10LE.");
+         return AV_PIX_FMT_GBRP10LE;
++      case AV_PIX_FMT_NV12:
++        return AV_PIX_FMT_NV12;
+       default:
+         break;
+     }
+@@ -192,6 +201,22 @@ static AVPixelFormat ChooseV4L2PixelFormat(AVCodecContext* aCodecContext,
+   return AV_PIX_FMT_NONE;
+ }
+ 
++static AVPixelFormat ChooseEsmppPixelFormat(AVCodecContext* aCodecContext,
++                                           const AVPixelFormat* aFormats) {
++  FFMPEGV_LOG("Choosing FFmpeg pixel format for esmpp video decoding.");
++  for (; *aFormats > -1; aFormats++) {
++    switch (*aFormats) {
++      case AV_PIX_FMT_DRM_PRIME:
++        FFMPEGV_LOG("Requesting pixel format DRM PRIME");
++        return AV_PIX_FMT_DRM_PRIME;
++      default:
++        break;
++    }
++  }
++  NS_WARNING("FFmpeg does not share any supported esmpp pixel formats.");
++  return AV_PIX_FMT_NONE;
++}
++
+ static AVPixelFormat ChooseD3D11VAPixelFormat(AVCodecContext* aCodecContext,
+                                               const AVPixelFormat* aFormats) {
+ #  ifdef MOZ_ENABLE_D3D11VA
+@@ -461,6 +486,55 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2Decoder() {
+   releaseDecoder.release();
+   return NS_OK;
+ }
++
++MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitEsmppDecoder() {
++  FFMPEG_LOG("Initialising esmpp-DRM FFmpeg decoder");
++  StaticMutexAutoLock mon(sMutex);
++
++  // Select the appropriate esmpp codec
++  AVCodec* codec = nullptr;
++  switch (mCodecID) {
++    case AV_CODEC_ID_H264:
++      codec = mLib->avcodec_find_decoder_by_name("h264_esmppvdec");
++      break;
++    case AV_CODEC_ID_HEVC:
++      codec = mLib->avcodec_find_decoder_by_name("hevc_esmppvdec");
++      break;
++  }
++  if (!codec) {
++    return NS_ERROR_DOM_MEDIA_FATAL_ERR;
++  }
++
++  if (!(mCodecContext = mLib->avcodec_alloc_context3(codec))) {
++    return NS_ERROR_OUT_OF_MEMORY;
++  }
++  mCodecContext->opaque = this;
++
++  InitHWCodecContext(ContextType::ESMPP);
++
++  mCodecContext->apply_cropping = 0;
++
++  auto releaseDecoder = MakeScopeExit([&] {
++    if (mCodecContext) {
++      mLib->av_freep(&mCodecContext);
++    }
++  });
++
++  MediaResult ret = AllocateExtraData();
++  if (NS_FAILED(ret)) {
++    mLib->av_freep(&mCodecContext);
++    return ret;
++  }
++
++  if (mLib->avcodec_open2(mCodecContext, codec, nullptr) < 0) {
++    mLib->av_freep(&mCodecContext);
++    return NS_ERROR_DOM_MEDIA_FATAL_ERR;
++  }
++
++  mUsingEsmpp = true;
++  releaseDecoder.release();
++  return NS_OK;
++}
+ #endif
+ 
+ #if LIBAVCODEC_VERSION_MAJOR < 58
+@@ -505,6 +579,7 @@ bool FFmpegVideoDecoder<LIBAV_VER>::ShouldEnableLinuxHWDecoding() const {
+   switch (mCodecID) {
+     case AV_CODEC_ID_H264:
+       supported = gfx::gfxVars::UseH264HwDecode();
++      supported = true;
+       break;
+     case AV_CODEC_ID_VP8:
+       supported = gfx::gfxVars::UseVP8HwDecode();
+@@ -598,6 +673,12 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWDecoderIfAllowed() {
+   }
+ #  endif  // MOZ_ENABLE_V4L2
+ 
++#  ifdef MOZ_ENABLE_ESMPP
++  if (NS_SUCCEEDED(InitEsmppDecoder())) {
++    return;
++  }
++#  endif  // MOZ_ENABLE_ESMPP
++
+ #  ifdef MOZ_ENABLE_D3D11VA
+   if (XRE_IsGPUProcess() && NS_SUCCEEDED(InitD3D11VADecoder())) {
+     return;
+@@ -955,6 +1036,8 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWCodecContext(ContextType aType) {
+     mCodecContext->get_format = ChooseV4L2PixelFormat;
+   } else if (aType == ContextType::VAAPI) {
+     mCodecContext->get_format = ChooseVAAPIPixelFormat;
++  } else if (aType == ContextType::ESMPP) {
++    mCodecContext->get_format = ChooseEsmppPixelFormat;
+   } else {
+     MOZ_DIAGNOSTIC_ASSERT(aType == ContextType::D3D11VA);
+     mCodecContext->get_format = ChooseD3D11VAPixelFormat;
+@@ -1176,6 +1259,9 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::DoDecode(
+       if (mUsingV4L2) {
+         rv = CreateImageV4L2(mFrame->pkt_pos, GetFramePts(mFrame),
+                              Duration(mFrame), aResults);
++      } else if (mUsingEsmpp) {
++        rv = CreateImageEsmpp(mFrame->pkt_pos, GetFramePts(mFrame),
++                             Duration(mFrame), aResults);
+       } else {
+         rv = CreateImageVAAPI(mFrame->pkt_pos, GetFramePts(mFrame),
+                               Duration(mFrame), aResults);
+@@ -1683,6 +1769,48 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::CreateImageV4L2(
+   aResults.AppendElement(std::move(vp));
+   return NS_OK;
+ }
++
++MediaResult FFmpegVideoDecoder<LIBAV_VER>::CreateImageEsmpp(
++    int64_t aOffset, int64_t aPts, int64_t aDuration,
++    MediaDataDecoder::DecodedData& aResults) {
++  FFMPEG_LOG("Esmpp Got one frame output with pts=%" PRId64 " dts=%" PRId64
++             " duration=%" PRId64,
++             aPts, mFrame->pkt_dts, aDuration);
++
++  AVDRMFrameDescriptor* desc = (AVDRMFrameDescriptor*)mFrame->data[0];
++  if (!desc || desc->nb_layers < 1) {
++    return MediaResult(NS_ERROR_DOM_MEDIA_DECODE_ERR,
++                       RESULT_DETAIL("Missing DRM PRIME descriptor in frame"));
++  }
++
++  MOZ_ASSERT(mTaskQueue->IsOnCurrentThread());
++  if (!mVideoFramePool) {
++    mVideoFramePool = MakeUnique<VideoFramePool<LIBAV_VER>>(20);
++  }
++
++  auto surface = mVideoFramePool->GetVideoFrameSurface(
++      *desc, mFrame->width, mFrame->height, mCodecContext, mFrame, mLib);
++  if (!surface) {
++    return MediaResult(NS_ERROR_DOM_MEDIA_DECODE_ERR,
++                       RESULT_DETAIL("Esmpp dmabuf allocation error"));
++  }
++
++  surface->SetYUVColorSpace(GetFrameColorSpace());
++  surface->SetColorRange(GetFrameColorRange());
++
++  RefPtr<VideoData> vp = VideoData::CreateFromImage(
++      mInfo.mDisplay, aOffset, TimeUnit::FromMicroseconds(aPts),
++      TimeUnit::FromMicroseconds(aDuration), surface->GetAsImage(),
++      !!mFrame->key_frame, TimeUnit::FromMicroseconds(-1));
++
++  if (!vp) {
++    return MediaResult(NS_ERROR_DOM_MEDIA_DECODE_ERR,
++                       RESULT_DETAIL("Esmpp image creation error"));
++  }
++
++  aResults.AppendElement(std::move(vp));
++  return NS_OK;
++}
+ #endif
+ 
+ RefPtr<MediaDataDecoder::FlushPromise>
+@@ -1753,7 +1881,7 @@ void FFmpegVideoDecoder<LIBAV_VER>::ProcessShutdown() {
+ bool FFmpegVideoDecoder<LIBAV_VER>::IsHardwareAccelerated(
+     nsACString& aFailureReason) const {
+ #if defined(MOZ_USE_HWDECODE) && defined(MOZ_WIDGET_GTK)
+-  return mUsingV4L2 || !!mVAAPIDeviceContext;
++  return mUsingEsmpp || mUsingV4L2 || !!mVAAPIDeviceContext;
+ #elif defined(MOZ_ENABLE_D3D11VA)
+   return !!mD3D11VADeviceContext;
+ #else
+diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
+index 7705811983..ae5d23009c 100644
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
+@@ -150,6 +150,7 @@ class FFmpegVideoDecoder<LIBAV_VER>
+     D3D11VA,
+     VAAPI,
+     V4L2,
++    ESMPP,
+   };
+   void InitHWCodecContext(ContextType aType);
+ 
+@@ -176,6 +177,7 @@ class FFmpegVideoDecoder<LIBAV_VER>
+   bool ShouldEnableLinuxHWDecoding() const;
+   MediaResult InitVAAPIDecoder();
+   MediaResult InitV4L2Decoder();
++  MediaResult InitEsmppDecoder();
+   bool CreateVAAPIDeviceContext();
+   AVCodec* FindVAAPICodec();
+   bool GetVAAPISurfaceDescriptor(VADRMPRIMESurfaceDescriptor* aVaDesc);
+@@ -188,10 +190,13 @@ class FFmpegVideoDecoder<LIBAV_VER>
+                                MediaDataDecoder::DecodedData& aResults);
+   MediaResult CreateImageV4L2(int64_t aOffset, int64_t aPts, int64_t aDuration,
+                               MediaDataDecoder::DecodedData& aResults);
++  MediaResult CreateImageEsmpp(int64_t aOffset, int64_t aPts, int64_t aDuration,
++                              MediaDataDecoder::DecodedData& aResults);
+   void AdjustHWDecodeLogging();
+ 
+   AVBufferRef* mVAAPIDeviceContext = nullptr;
+   bool mUsingV4L2 = false;
++  bool mUsingEsmpp = false;
+   VADisplay mDisplay = nullptr;
+   UniquePtr<VideoFramePool<LIBAV_VER>> mVideoFramePool;
+   static nsTArray<AVCodecID> mAcceleratedFormats;
+-- 
+2.43.0
+

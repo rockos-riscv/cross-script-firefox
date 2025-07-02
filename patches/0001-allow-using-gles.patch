@@ -1,0 +1,25 @@
+From 6117594d1349e662079f6f2a88743c864f8d806a Mon Sep 17 00:00:00 2001
+From: Sakura286 <Sakura286>
+Date: Wed, 18 Jun 2025 03:18:14 +0000
+Subject: [PATCH 01/12] allow using gles
+
+---
+ toolkit/xre/glxtest/glxtest.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/toolkit/xre/glxtest/glxtest.cpp b/toolkit/xre/glxtest/glxtest.cpp
+index 077bf2a396..307f98a7c0 100644
+--- a/toolkit/xre/glxtest/glxtest.cpp
++++ b/toolkit/xre/glxtest/glxtest.cpp
+@@ -438,7 +438,7 @@ static bool get_egl_gl_status(EGLDisplay dpy,
+   PFNGLGETSTRING glGetString =
+       cast<PFNGLGETSTRING>(eglGetProcAddress("glGetString"));
+ 
+-#if defined(__arm__) || defined(__aarch64__)
++#if defined(__arm__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
+   bool useGles = true;
+ #else
+   bool useGles = false;
+-- 
+2.43.0
+

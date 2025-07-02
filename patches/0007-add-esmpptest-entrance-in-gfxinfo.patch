@@ -1,0 +1,96 @@
+From 511e7a6f5215b3bcc03eb628ca6b8c9e4de85f08 Mon Sep 17 00:00:00 2001
+From: CHEN Xuan <chenxuan@iscas.ac.cn>
+Date: Tue, 1 Jul 2025 10:50:29 +0000
+Subject: [PATCH 07/12] add esmpptest entrance in gfxinfo
+
+---
+ widget/gtk/GfxInfo.cpp | 66 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 62 insertions(+), 4 deletions(-)
+
+diff --git a/widget/gtk/GfxInfo.cpp b/widget/gtk/GfxInfo.cpp
+index 08eb7ab22b..4589e920a7 100644
+--- a/widget/gtk/GfxInfo.cpp
++++ b/widget/gtk/GfxInfo.cpp
+@@ -838,17 +838,75 @@ void GfxInfo::V4L2ProbeDevice(nsCString& dev) {
+   }
+ }
+ 
++
++//#ifdef MOZ_ENABLE_ESMPP
++
+ void GfxInfo::GetDataESMPP() {
+   if (mIsESMPPSupported.isSome()) {
+     return;
+   }
+-  mIsESMPPSupported = Some(true);
++  mIsESMPPSupported = Some(false);
++
++  char* esmppData = nullptr;
++  auto free = mozilla::MakeScopeExit([&] { g_free((void*)esmppData); });
+ 
++  int esmppPipe = -1;
++  int esmppPID = 0;
++  const char* args[] = {nullptr};
++  esmppPID = FireTestProcess(ESMPP_PROBE_BINARY, &esmppPipe, args);
++  if (!esmppPID) {
++    return;
++  }
+ 
+-  mVAAPISupportedCodecs = CODEC_HW_H264;
++  if (!ManageChildProcess("esmpptest", &esmppPID, &esmppPipe,
++                          ESMPP_TEST_TIMEOUT, &esmppData)) {
++    gfxCriticalNote << "esmpptest: ManageChildProcess failed\n";
++    return;
++  }
+ 
+-  media::MCSInfo::AddSupport(
+-      media::MediaCodecsSupport::H264HardwareDecode);
++  char* bufptr = esmppData;
++  char* line;
++  while ((line = NS_strtok("\n", &bufptr))) {
++    if (!strcmp(line, "SUPPORTED")) {
++      line = NS_strtok("\n", &bufptr);
++      if (!line) {
++        gfxCriticalNote << "esmpptest: Failed to get ESMPP support\n";
++        return;
++      }
++      mIsESMPPSupported = Some(!strcmp(line, "TRUE"));
++    } else if (!strcmp(line, "HWCODECS")) {
++      line = NS_strtok("\n", &bufptr);
++      if (!line) {
++        gfxCriticalNote << "esmpptest: Failed to get ESMPP codecs\n";
++        return;
++      }
++
++      std::istringstream(line) >> mESMPPSupportedCodecs;
++      if (mESMPPSupportedCodecs & CODEC_HW_H264) {
++        media::MCSInfo::AddSupport(
++            media::MediaCodecsSupport::H264HardwareDecode);
++      }
++      if (mESMPPSupportedCodecs & CODEC_HW_VP8) {
++        media::MCSInfo::AddSupport(
++            media::MediaCodecsSupport::VP8HardwareDecode);
++      }
++      if (mESMPPSupportedCodecs & CODEC_HW_VP9) {
++        media::MCSInfo::AddSupport(
++            media::MediaCodecsSupport::VP9HardwareDecode);
++      }
++      if (mESMPPSupportedCodecs & CODEC_HW_AV1) {
++        media::MCSInfo::AddSupport(
++            media::MediaCodecsSupport::AV1HardwareDecode);
++      }
++    } else if (!strcmp(line, "WARNING") || !strcmp(line, "ERROR")) {
++      gfxCriticalNote << "esmpptest: " << line;
++      line = NS_strtok("\n", &bufptr);
++      if (line) {
++        gfxCriticalNote << "esmpptest: " << line << "\n";
++      }
++      return;
++    }
++  }
+ }
+ 
+ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
+-- 
+2.43.0
+

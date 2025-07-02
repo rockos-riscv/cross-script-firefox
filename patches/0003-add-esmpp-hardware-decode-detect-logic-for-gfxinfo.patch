@@ -1,0 +1,95 @@
+From 37185631faba9c8c30fbbe64b720ccd85d77f8a9 Mon Sep 17 00:00:00 2001
+From: Sakura286 <Sakura286>
+Date: Wed, 18 Jun 2025 03:48:54 +0000
+Subject: [PATCH 03/12] add esmpp hardware decode detect logic for gfxinfo
+
+---
+ widget/gtk/GfxInfo.cpp | 22 ++++++++++++++++++++--
+ widget/gtk/GfxInfo.h   |  3 +++
+ 2 files changed, 23 insertions(+), 2 deletions(-)
+
+diff --git a/widget/gtk/GfxInfo.cpp b/widget/gtk/GfxInfo.cpp
+index 87a96802d9..08eb7ab22b 100644
+--- a/widget/gtk/GfxInfo.cpp
++++ b/widget/gtk/GfxInfo.cpp
+@@ -41,10 +41,12 @@
+ #define GFX_TEST_TIMEOUT 4000
+ #define VAAPI_TEST_TIMEOUT 2000
+ #define V4L2_TEST_TIMEOUT 2000
++#define ESMPP_TEST_TIMEOUT 2000
+ 
+ #define GLX_PROBE_BINARY u"glxtest"_ns
+ #define VAAPI_PROBE_BINARY u"vaapitest"_ns
+ #define V4L2_PROBE_BINARY u"v4l2test"_ns
++#define ESMPP_PROBE_BINARY u"esmpptest"_ns
+ 
+ namespace mozilla::widget {
+ 
+@@ -836,6 +838,19 @@ void GfxInfo::V4L2ProbeDevice(nsCString& dev) {
+   }
+ }
+ 
++void GfxInfo::GetDataESMPP() {
++  if (mIsESMPPSupported.isSome()) {
++    return;
++  }
++  mIsESMPPSupported = Some(true);
++
++
++  mVAAPISupportedCodecs = CODEC_HW_H264;
++
++  media::MCSInfo::AddSupport(
++      media::MediaCodecsSupport::H264HardwareDecode);
++}
++
+ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
+   if (!sDriverInfo->Length()) {
+     // Mesa 10.0 provides the GLX_MESA_query_renderer extension, which allows us
+@@ -1306,7 +1321,8 @@ nsresult GfxInfo::GetFeatureStatusImpl(
+       continue;
+     }
+     if ((mVAAPISupportedCodecs & pair.mCodec) ||
+-        (mV4L2SupportedCodecs & pair.mCodec)) {
++        (mV4L2SupportedCodecs & pair.mCodec)  ||
++        (mESMPPSupportedCodecs & pair.mCodec)) {
+       *aStatus = nsIGfxInfo::FEATURE_STATUS_OK;
+     } else {
+       *aStatus = nsIGfxInfo::FEATURE_BLOCKED_PLATFORM_TEST;
+@@ -1330,11 +1346,13 @@ nsresult GfxInfo::GetFeatureStatusImpl(
+     if (probeHWDecode) {
+       GetDataVAAPI();
+       GetDataV4L2();
++      GetDataESMPP();
+     } else {
+       mIsVAAPISupported = Some(false);
+       mIsV4L2Supported = Some(false);
++      mIsESMPPSupported = Some(false);
+     }
+-    if (!mIsVAAPISupported.value() && !mIsV4L2Supported.value()) {
++    if (!mIsVAAPISupported.value() && !mIsV4L2Supported.value() && !mIsESMPPSupported.value()) {
+       *aStatus = nsIGfxInfo::FEATURE_BLOCKED_PLATFORM_TEST;
+       aFailureId = "FEATURE_FAILURE_VIDEO_DECODING_TEST_FAILED";
+     }
+diff --git a/widget/gtk/GfxInfo.h b/widget/gtk/GfxInfo.h
+index 26b4554b4a..a72a1d09d7 100644
+--- a/widget/gtk/GfxInfo.h
++++ b/widget/gtk/GfxInfo.h
+@@ -121,12 +121,15 @@ class GfxInfo final : public GfxInfoBase {
+   int mVAAPISupportedCodecs = 0;
+   mozilla::Maybe<bool> mIsV4L2Supported;
+   int mV4L2SupportedCodecs = 0;
++  mozilla::Maybe<bool> mIsESMPPSupported;
++  int mESMPPSupportedCodecs = 0;
+ 
+   static int sGLXTestPipe;
+   static pid_t sGLXTestPID;
+ 
+   void GetDataVAAPI();
+   void GetDataV4L2();
++  void GetDataESMPP();
+   void V4L2ProbeDevice(nsCString& dev);
+   void AddCrashReportAnnotations();
+ };
+-- 
+2.43.0
+

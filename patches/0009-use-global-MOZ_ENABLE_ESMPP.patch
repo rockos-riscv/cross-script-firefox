@@ -1,0 +1,41 @@
+From 93935d5330be72fd9129182d1effc5c421d8024f Mon Sep 17 00:00:00 2001
+From: CHEN Xuan <chenxuan@iscas.ac.cn>
+Date: Tue, 1 Jul 2025 10:54:09 +0000
+Subject: [PATCH 09/12] use global MOZ_ENABLE_ESMPP
+
+---
+ dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+index ffbd2352c6..882a78aced 100644
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+@@ -36,7 +36,6 @@
+ #  include "mozilla/layers/DMABUFSurfaceImage.h"
+ #  include "FFmpegVideoFramePool.h"
+ #  include "va/va.h"
+-#define ES_MPP 1
+ #endif
+ 
+ #if defined(MOZ_AV1) && \
+@@ -1045,14 +1044,14 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWCodecContext(ContextType aType) {
+   }
+ 
+   if (mCodecID == AV_CODEC_ID_H264) {
+-#if !defined(ES_MPP)
++#if !defined(MOZ_ENABLE_ESMPP)
+     mCodecContext->extra_hw_frames =
+         H264::ComputeMaxRefFrames(mInfo.mExtraData);
+ #else
+     mCodecContext->extra_hw_frames = 16;
+ #endif
+   } else if (mCodecID == AV_CODEC_ID_HEVC) {
+-#if !defined(ES_MPP)
++#if !defined(MOZ_ENABLE_ESMPP)
+     mCodecContext->extra_hw_frames =
+         H265::ComputeMaxRefFrames(mInfo.mExtraData);
+ #else
+-- 
+2.43.0
+

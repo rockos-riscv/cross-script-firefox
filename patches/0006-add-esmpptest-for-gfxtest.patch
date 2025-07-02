@@ -1,0 +1,257 @@
+From eccfca2080ad3acf7ed7a267d93be3fc708261d9 Mon Sep 17 00:00:00 2001
+From: CHEN Xuan <chenxuan@iscas.ac.cn>
+Date: Tue, 1 Jul 2025 10:49:42 +0000
+Subject: [PATCH 06/12] add esmpptest for gfxtest
+
+---
+ browser/installer/package-manifest.in         |   3 +
+ dom/media/platforms/ffmpeg/ffmpeg61/moz.build |   2 +-
+ dom/media/platforms/ffmpeg/ffvpx/moz.build    |   2 +-
+ toolkit/moz.configure                         |   2 +
+ widget/gtk/esmpptest/esmpptest.cpp            | 138 ++++++++++++++++++
+ widget/gtk/esmpptest/moz.build                |  19 +++
+ widget/gtk/moz.build                          |   3 +
+ 7 files changed, 167 insertions(+), 2 deletions(-)
+ create mode 100644 widget/gtk/esmpptest/esmpptest.cpp
+ create mode 100644 widget/gtk/esmpptest/moz.build
+
+diff --git a/browser/installer/package-manifest.in b/browser/installer/package-manifest.in
+index 89cff6b562..a97b725eb5 100644
+--- a/browser/installer/package-manifest.in
++++ b/browser/installer/package-manifest.in
+@@ -118,6 +118,9 @@
+ ; Similar to glxtest, this tests the capabilities of the Video Acceleration API (VA-API).
+ @BINPATH@/vaapitest
+ #endif
++#ifdef MOZ_ENABLE_ESMPP
++@BINPATH@/esmpptest
++#endif
+ #endif
+ 
+ ; We don't have a complete view of which dlls to expect when doing an artifact
+diff --git a/dom/media/platforms/ffmpeg/ffmpeg61/moz.build b/dom/media/platforms/ffmpeg/ffmpeg61/moz.build
+index fce65109e5..406a69f878 100644
+--- a/dom/media/platforms/ffmpeg/ffmpeg61/moz.build
++++ b/dom/media/platforms/ffmpeg/ffmpeg61/moz.build
+@@ -32,7 +32,7 @@ if CONFIG["CC_TYPE"] == "gcc":
+     ]
+ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+     CXXFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]
+-if CONFIG["MOZ_ENABLE_VAAPI"] or CONFIG["MOZ_ENABLE_V4L2"]:
++if CONFIG["MOZ_ENABLE_VAAPI"] or CONFIG["MOZ_ENABLE_V4L2"] or CONFIG["MOZ_ENABLE_ESMPP"]:
+     UNIFIED_SOURCES += ["../FFmpegVideoFramePool.cpp"]
+     LOCAL_INCLUDES += ["/third_party/drm/drm/include/libdrm/"]
+     USE_LIBS += ["mozva"]
+diff --git a/dom/media/platforms/ffmpeg/ffvpx/moz.build b/dom/media/platforms/ffmpeg/ffvpx/moz.build
+index 27c9b65cec..ebc257647a 100644
+--- a/dom/media/platforms/ffmpeg/ffvpx/moz.build
++++ b/dom/media/platforms/ffmpeg/ffvpx/moz.build
+@@ -44,7 +44,7 @@ DEFINES["USING_MOZFFVPX"] = True
+ 
+ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+     CXXFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]
+-if CONFIG["MOZ_ENABLE_VAAPI"] or CONFIG["MOZ_ENABLE_V4L2"]:
++if CONFIG["MOZ_ENABLE_VAAPI"] or CONFIG["MOZ_ENABLE_V4L2"] or CONFIG["MOZ_ENABLE_ESMPP"]:
+     UNIFIED_SOURCES += ["../FFmpegVideoFramePool.cpp"]
+     LOCAL_INCLUDES += ["/third_party/drm/drm/include/libdrm/"]
+     USE_LIBS += ["mozva"]
+diff --git a/toolkit/moz.configure b/toolkit/moz.configure
+index e5e517635d..29c720dd3a 100644
+--- a/toolkit/moz.configure
++++ b/toolkit/moz.configure
+@@ -666,6 +666,8 @@ set_define("MOZ_WAYLAND", depends_if(wayland_headers)(lambda _: True))
+ set_config("MOZ_ENABLE_VAAPI", True, when=toolkit_gtk)
+ set_define("MOZ_ENABLE_VAAPI", True, when=toolkit_gtk)
+ 
++set_config("MOZ_ENABLE_ESMPP", True, when=toolkit_gtk)
++set_define("MOZ_ENABLE_ESMPP", True, when=toolkit_gtk)
+ 
+ @depends(target, toolkit_gtk)
+ def v4l2(target, toolkit_gtk):
+diff --git a/widget/gtk/esmpptest/esmpptest.cpp b/widget/gtk/esmpptest/esmpptest.cpp
+new file mode 100644
+index 0000000000..bc0a3d1264
+--- /dev/null
++++ b/widget/gtk/esmpptest/esmpptest.cpp
+@@ -0,0 +1,138 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
++ * vim: sw=2 ts=8 et :
++ */
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include <cstdlib>
++#include <fcntl.h>
++#include <dlfcn.h>
++
++#if defined(MOZ_ASAN) || defined(FUZZING)
++#  include <signal.h>
++#endif
++#include <unistd.h>
++#include <stdarg.h>
++#ifdef __SUNPRO_CC
++#  include <stdio.h>
++#endif
++
++#include "mozilla/GfxInfoUtils.h"
++
++#define OUTPUT_PIPE 1
++
++using EsMppCtx = void *;
++
++using EsMppCtxType = enum {
++  MPP_CTX_DEC,
++  MPP_CTX_ENC,
++};
++
++using EsMppCodingType = enum {
++  MPP_VIDEO_CodingAVC = 0x7,
++  MPP_VIDEO_CodingHEVC = 0x1000004,
++};
++
++using HwAccelCodec = enum {
++  CODEC_HW_H264 = 1 << 4,
++  CODEC_HW_HEVC = 1 << 8,
++};
++
++using create_handle = int (*)(EsMppCtx *ctx, EsMppCtxType, EsMppCodingType, int);
++using destroy_handle = int (*)(EsMppCtx);
++using init_handle = int (*)(EsMppCtx);
++using deinit_handle = int (*)(EsMppCtx);
++
++void* EsMpp;
++create_handle EsMppCreate;
++destroy_handle EsMppDestroy;
++init_handle EsMppInit;
++deinit_handle EsMppDeinit;
++
++int fail(const char* msg){
++  record_value("ERROR\n%s\n", msg);
++  if (EsMpp){
++    dlclose(EsMpp);
++  }
++  record_flush();
++  return EXIT_FAILURE;
++}
++
++int main(int argc, char** argv) {
++  int supported = 0;
++  const char* env = getenv("MOZ_GFX_DEBUG");
++  enable_logging = env && *env == '1';
++  output_pipe = OUTPUT_PIPE;
++  HwAccelCodec hwaccels[] = {CODEC_HW_H264,
++                             CODEC_HW_HEVC};
++  EsMppCodingType esmppcodings[] = {MPP_VIDEO_CodingAVC,
++                                    MPP_VIDEO_CodingHEVC};
++
++  if (!enable_logging) {
++    close_logging();
++  }
++
++  log("Testing EsMpp\n");
++
++#if defined(MOZ_ASAN) || defined(FUZZING)
++  // If handle_segv=1 (default), then glxtest crash will print a sanitizer
++  // report which can confuse the harness in fuzzing automation.
++  signal(SIGSEGV, SIG_DFL);
++#endif
++
++  EsMpp = dlopen("libes_mpp.so", RTLD_LAZY | RTLD_DEEPBIND);
++  if(!EsMpp){
++    return fail("Can not load esmpp library");
++  }
++  EsMppCreate = reinterpret_cast<create_handle>(dlsym(EsMpp, "esmpp_create"));
++  if(!EsMppCreate){
++    return fail("Can not bind esmpp_create");
++  }
++  EsMppInit = reinterpret_cast<init_handle>(dlsym(EsMpp, "esmpp_init"));
++  if(!EsMppInit){
++    return fail("Can not bind esmpp_init");
++  }
++  EsMppDeinit = reinterpret_cast<deinit_handle>(dlsym(EsMpp, "esmpp_deinit"));
++  if(!EsMppDeinit){
++    return fail("Can not bind esmpp_deinit");
++  }
++  EsMppDestroy = reinterpret_cast<destroy_handle>(dlsym(EsMpp, "esmpp_destroy"));
++  if(!EsMppDestroy){
++    return fail("Can not bind esmpp_destroy");
++  }
++
++  log("EsMpp Library Loaded\n");
++
++  for (uint i=0; i < sizeof(esmppcodings) / sizeof(EsMppCodingType); i++) {
++    EsMppCtx esmppctx = nullptr;
++    int mppret = 0;
++
++    if ((mppret = EsMppCreate(&esmppctx, MPP_CTX_DEC, esmppcodings[i], 0))) {
++      log("Can not create esmpp context for codec id %d, MPP_RET is %d\n", esmppcodings[i], mppret);
++      continue;
++    }
++
++    if((mppret = EsMppInit(esmppctx))) {
++      log("EsMpp can not init codec id %d, MPP_RET is %d\n", esmppcodings[i], mppret);
++      continue;
++    }
++
++    if((mppret = EsMppDeinit(esmppctx))) {
++      log("EsMpp can not deinit codec id %d, MPP_RET is %d\n", esmppcodings[i], mppret);
++      continue;
++    }
++
++    if((mppret = EsMppDestroy(esmppctx))) {
++      log("EsMpp can not destroy codec id %d, MPP_RET is %d\n", esmppcodings[i], mppret);
++      continue;
++    }
++
++    supported |= hwaccels[i];
++  }
++
++  record_value("SUPPORTED\n%s\nHWCODECS\n%d\n", supported ? "TRUE" : "FALSE", supported);
++  dlclose(EsMpp);
++  record_flush();
++  return EXIT_SUCCESS;
++}
+\ No newline at end of file
+diff --git a/widget/gtk/esmpptest/moz.build b/widget/gtk/esmpptest/moz.build
+new file mode 100644
+index 0000000000..f60b86ef26
+--- /dev/null
++++ b/widget/gtk/esmpptest/moz.build
+@@ -0,0 +1,19 @@
++# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
++# vim: set filetype=python:
++# This Source Code Form is subject to the terms of the Mozilla Public
++# License, v. 2.0. If a copy of the MPL was not distributed with this
++# file, You can obtain one at http://mozilla.org/MPL/2.0/.
++
++with Files("**"):
++    BUG_COMPONENT = ("Toolkit", "Startup and Profile System")
++
++Program("esmpptest")
++SOURCES += [
++    "esmpptest.cpp",
++]
++
++CXXFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]
++CXXFLAGS += CONFIG["MOZ_PANGO_CFLAGS"]
++OS_LIBS += CONFIG["MOZ_X11_LIBS"]
++OS_LIBS += CONFIG["MOZ_GTK3_LIBS"]
++OS_LIBS += ["dl"]
+diff --git a/widget/gtk/moz.build b/widget/gtk/moz.build
+index a3d475ede7..7c3ff01643 100644
+--- a/widget/gtk/moz.build
++++ b/widget/gtk/moz.build
+@@ -31,6 +31,9 @@ if CONFIG["MOZ_ENABLE_VAAPI"]:
+ if CONFIG["MOZ_ENABLE_V4L2"]:
+     DIRS += ["v4l2test"]
+ 
++if CONFIG["MOZ_ENABLE_ESMPP"]:
++    DIRS += ["esmpptest"]
++
+ EXPORTS += [
+     "MozContainer.h",
+     "nsGTKToolkit.h",
+-- 
+2.43.0
+

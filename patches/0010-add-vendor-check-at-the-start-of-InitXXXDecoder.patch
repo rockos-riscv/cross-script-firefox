@@ -1,0 +1,176 @@
+From 31b7917fbbb80524b0f139b7e7a22fcbcf936f62 Mon Sep 17 00:00:00 2001
+From: CHEN Xuan <chenxuan@iscas.ac.cn>
+Date: Tue, 1 Jul 2025 10:55:29 +0000
+Subject: [PATCH 10/12] add vendor check at the start of InitXXXDecoder
+
+---
+ dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp | 15 +++++++++++++++
+ gfx/config/gfxVars.h                              |  1 +
+ gfx/thebes/gfxPlatform.cpp                        | 15 +++++++++++++++
+ gfx/thebes/gfxPlatform.h                          |  4 ++++
+ gfx/thebes/gfxPlatformGtk.cpp                     | 15 +++++++++++++++
+ gfx/thebes/gfxPlatformGtk.h                       |  1 +
+ 6 files changed, 51 insertions(+)
+
+diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+index 882a78aced..48fc8721a0 100644
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+@@ -317,6 +317,11 @@ void FFmpegVideoDecoder<LIBAV_VER>::AdjustHWDecodeLogging() {
+ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitVAAPIDecoder() {
+   FFMPEG_LOG("Initialising VA-API FFmpeg decoder");
+ 
++  if (gfx::gfxVars::IsGPUVendorPVR()) {
++    FFMPEG_LOG("VAAPI is disabled when using built-in IMG GPU.");
++    return NS_ERROR_NOT_AVAILABLE;
++  }
++
+   StaticMutexAutoLock mon(sMutex);
+ 
+   // mAcceleratedFormats is already configured so check supported
+@@ -489,6 +494,16 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2Decoder() {
+ 
+ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitEsmppDecoder() {
+   FFMPEG_LOG("Initialising esmpp-DRM FFmpeg decoder");
++
++  if (!XRE_IsRDDProcess()) {
++    FFMPEG_LOG("ESMPP works in RDD process only");
++    return NS_ERROR_NOT_AVAILABLE;
++  }
++  if (!gfx::gfxVars::IsGPUVendorPVR()) {
++    FFMPEG_LOG("Zero-copy mode of ESMPP only works when PVR gpu is enabled");
++    return NS_ERROR_NOT_AVAILABLE;
++  }
++
+   StaticMutexAutoLock mon(sMutex);
+ 
+   // Select the appropriate esmpp codec
+diff --git a/gfx/config/gfxVars.h b/gfx/config/gfxVars.h
+index 63e03dbac7..3e64ffd8b6 100644
+--- a/gfx/config/gfxVars.h
++++ b/gfx/config/gfxVars.h
+@@ -37,6 +37,7 @@ class gfxVarReceiver;
+   _(DXNV12Blocked, bool, false)                                    \
+   _(DXP010Blocked, bool, false)                                    \
+   _(DXP016Blocked, bool, false)                                    \
++  _(IsGPUVendorPVR, bool, false)                                   \
+   _(UseWebRenderANGLE, bool, false)                                \
+   _(UseWebRenderFlipSequentialWin, bool, false)                    \
+   _(UseWebRenderDCompWin, bool, false)                             \
+diff --git a/gfx/thebes/gfxPlatform.cpp b/gfx/thebes/gfxPlatform.cpp
+index cd817b7834..9908701d81 100644
+--- a/gfx/thebes/gfxPlatform.cpp
++++ b/gfx/thebes/gfxPlatform.cpp
+@@ -2394,6 +2394,8 @@ gfxImageFormat gfxPlatform::OptimalFormatForContent(gfxContentType aContent) {
+  * not have any effect until we restart.
+  */
+ static mozilla::Atomic<bool> sLayersSupportsHardwareVideoDecoding(false);
++static mozilla::Atomic<bool> sLayersIsGPUVendorPVR(false);
++
+ static bool sLayersHardwareVideoDecodingFailed = false;
+ 
+ static mozilla::Atomic<bool> sLayersAccelerationPrefsInitialized(false);
+@@ -2401,6 +2403,7 @@ static mozilla::Atomic<bool> sLayersAccelerationPrefsInitialized(false);
+ static void VideoDecodingFailedChangedCallback(const char* aPref, void*) {
+   sLayersHardwareVideoDecodingFailed = Preferences::GetBool(aPref, false);
+   gfxPlatform::GetPlatform()->UpdateCanUseHardwareVideoDecoding();
++  gfxPlatform::GetPlatform()->UpdateIsGPUVendorPVR();
+ }
+ 
+ void gfxPlatform::UpdateCanUseHardwareVideoDecoding() {
+@@ -2409,6 +2412,12 @@ void gfxPlatform::UpdateCanUseHardwareVideoDecoding() {
+   }
+ }
+ 
++void gfxPlatform::UpdateIsGPUVendorPVR() {
++  if (XRE_IsParentProcess()) {
++    gfxVars::SetIsGPUVendorPVR(IsGPUVendorPVR());
++  }
++}
++
+ void gfxPlatform::UpdateForceSubpixelAAWherePossible() {
+   bool forceSubpixelAAWherePossible =
+       StaticPrefs::gfx_webrender_quality_force_subpixel_aa_where_possible();
+@@ -2458,6 +2467,7 @@ void gfxPlatform::InitAcceleration() {
+ 
+   if (StaticPrefs::media_hardware_video_decoding_enabled_AtStartup()) {
+ #ifdef MOZ_WIDGET_GTK
++    sLayersIsGPUVendorPVR = gfxPlatformGtk::GetPlatform()->CheckIsGPUVendorPVR();
+     sLayersSupportsHardwareVideoDecoding =
+         gfxPlatformGtk::GetPlatform()->InitVAAPIConfig(
+             StaticPrefs::
+@@ -3383,6 +3393,11 @@ bool gfxPlatform::CanUseHardwareVideoDecoding() {
+          !sLayersHardwareVideoDecodingFailed;
+ }
+ 
++bool gfxPlatform::IsGPUVendorPVR() {
++  // this function is called from the compositor thread
++  return sLayersIsGPUVendorPVR;
++}
++
+ bool gfxPlatform::AccelerateLayersByDefault() {
+ #if defined(MOZ_GL_PROVIDER) || defined(MOZ_WIDGET_UIKIT)
+   return true;
+diff --git a/gfx/thebes/gfxPlatform.h b/gfx/thebes/gfxPlatform.h
+index 6b0fab3fdf..0f0224d06e 100644
+--- a/gfx/thebes/gfxPlatform.h
++++ b/gfx/thebes/gfxPlatform.h
+@@ -507,6 +507,8 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
+     }
+   }
+ 
++  void UpdateIsGPUVendorPVR();
++
+   /**
+    * Are we going to try color management?
+    */
+@@ -918,6 +920,8 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
+ 
+   virtual bool CanUseHardwareVideoDecoding();
+ 
++  virtual bool IsGPUVendorPVR();
++
+   int8_t mAllowDownloadableFonts;
+ 
+   // Whether the platform supports rendering OpenType font variations
+diff --git a/gfx/thebes/gfxPlatformGtk.cpp b/gfx/thebes/gfxPlatformGtk.cpp
+index 256a140aac..6cb0fb2311 100644
+--- a/gfx/thebes/gfxPlatformGtk.cpp
++++ b/gfx/thebes/gfxPlatformGtk.cpp
+@@ -312,6 +312,21 @@ bool gfxPlatformGtk::InitVAAPIConfig(bool aForceEnabledByUser) {
+   return feature.IsEnabled();
+ }
+ 
++bool gfxPlatformGtk::CheckIsGPUVendorPVR() {
++  nsCOMPtr<nsIGfxInfo> gfxInfo = components::GfxInfo::Service();
++
++  nsString vendorID;
++  if (NS_FAILED(gfxInfo->GetAdapterVendorID(vendorID))) {
++    return false;
++  };
++
++  if (vendorID.EqualsLiteral("Imagination Technologies")) {
++    return true;
++  }
++
++  return false;
++}
++
+ void gfxPlatformGtk::InitWebRenderConfig() {
+   gfxPlatform::InitWebRenderConfig();
+ 
+diff --git a/gfx/thebes/gfxPlatformGtk.h b/gfx/thebes/gfxPlatformGtk.h
+index c28a224925..975cdf73f6 100644
+--- a/gfx/thebes/gfxPlatformGtk.h
++++ b/gfx/thebes/gfxPlatformGtk.h
+@@ -69,6 +69,7 @@ class gfxPlatformGtk final : public gfxPlatform {
+   void InitX11EGLConfig();
+   void InitDmabufConfig();
+   bool InitVAAPIConfig(bool aForceEnabledByUser);
++  bool CheckIsGPUVendorPVR();
+   void InitPlatformGPUProcessPrefs() override;
+   void InitWebRenderConfig() override;
+   void BuildContentDeviceData(mozilla::gfx::ContentDeviceData* aOut) override;
+-- 
+2.43.0
+

@@ -1,4 +1,4 @@
-FROM ubuntu:noble 
+FROM ubuntu:noble
 
 MAINTAINER CHEN Xuan
 
@@ -26,7 +26,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
     rustup target add riscv64gc-unknown-linux-gnu
 
 # Prepare sysroot
-RUN git clone --depth=1 https://github.com/Sakura286/cross-script-firefox $SCRIPT_DIR && \
+RUN git clone --depth=1 --branch=137-orig https://github.com/Sakura286/cross-script-firefox $SCRIPT_DIR && \
     patch -p0 /usr/sbin/multistrap $SCRIPT_DIR/multistrap-auth.patch && \
     multistrap -a riscv64 -d $SYSROOT_DIR -f $SCRIPT_DIR/sysroot-riscv64.conf
 
@@ -35,6 +35,9 @@ RUN dget -u https://snapshot.debian.org/archive/debian/20250416T084123Z/pool/mai
 
 # Create Mozconfig
 WORKDIR $FIREFOX_DIR
+## patchset
+RUN for i in $(ls $SCRIPT_DIR/patches); do patch -p1 < $SCRIPT_DIR/patches/$i; done
+## configuration
 RUN <<EOF cat >> mozconfig
 ac_add_options --enable-release
 ac_add_options --enable-default-toolkit=cairo-gtk3-wayland
@@ -59,8 +62,8 @@ ac_add_options --without-wasm-sandboxed-libraries
 ac_add_options --with-sysroot=$SYSROOT_DIR
 EOF
 
-# Build & Package
-# RUN ./mach configure
-# RUN ./mach build -j$(nproc)
-# RUN ./mach package
+Build & Package
+RUN ./mach configure
+RUN ./mach build -j$(nproc)
+RUN ./mach package
 # The target tarball path is obj-riscv64-unknown-linux-gnu/dist/firefox-131.0.2.en-US.linux-riscv64.tar.bz2
