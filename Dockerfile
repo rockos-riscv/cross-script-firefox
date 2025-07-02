@@ -26,7 +26,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
     rustup target add riscv64gc-unknown-linux-gnu
 
 # Prepare sysroot
-RUN git clone --depth=1 --branch=137-orig https://github.com/Sakura286/cross-script-firefox $SCRIPT_DIR && \
+RUN git clone --depth=1 --branch=137-orig https://github.com/rockos-riscv/cross-script-firefox $SCRIPT_DIR && \
     patch -p0 /usr/sbin/multistrap $SCRIPT_DIR/multistrap-auth.patch && \
     multistrap -a riscv64 -d $SYSROOT_DIR -f $SCRIPT_DIR/sysroot-riscv64.conf
 
