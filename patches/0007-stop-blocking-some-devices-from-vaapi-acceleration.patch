@@ -1,17 +1,17 @@
-From 5a8c94172431d1690ab854bdecd26d6f73204ad5 Mon Sep 17 00:00:00 2001
-From: CHEN Xuan <chenxuan@iscas.ac.cn>
-Date: Tue, 1 Jul 2025 10:52:12 +0000
-Subject: [PATCH 08/12] stop blocking some devices from vaapi accelerate
+From b1caf8dd453af93e08034df76cc8f53f7a7fbae4 Mon Sep 17 00:00:00 2001
+From: Sakura286 <Sakura286>
+Date: Fri, 22 Aug 2025 06:34:24 +0000
+Subject: [PATCH 07/12] stop blocking some devices from vaapi acceleration
 
 ---
  widget/gtk/GfxInfo.cpp | 12 ++++++------
  1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/widget/gtk/GfxInfo.cpp b/widget/gtk/GfxInfo.cpp
-index 4589e920a7..c7234c9ffa 100644
+index 82530e4e61..b040a4f687 100644
 --- a/widget/gtk/GfxInfo.cpp
 +++ b/widget/gtk/GfxInfo.cpp
-@@ -1168,12 +1168,12 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
+@@ -1196,12 +1196,12 @@ const nsTArray<RefPtr<GfxDriverInfo>>& GfxInfo::GetGfxDriverInfo() {
          V(0, 0, 0, 0), "FEATURE_HARDWARE_VIDEO_DECODING_NO_LINUX_AMD", "");
  
      // Disable on r600 driver due to decoding artifacts (Bug 1824307)

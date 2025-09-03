@@ -1,7 +1,7 @@
-From 6117594d1349e662079f6f2a88743c864f8d806a Mon Sep 17 00:00:00 2001
+From dceb30091272e4ea1bfec29eb23d7ec301fd7cfa Mon Sep 17 00:00:00 2001
 From: Sakura286 <Sakura286>
-Date: Wed, 18 Jun 2025 03:18:14 +0000
-Subject: [PATCH 01/12] allow using gles
+Date: Fri, 22 Aug 2025 04:01:20 +0000
+Subject: [PATCH 01/12] allow using lges
 
 ---
  toolkit/xre/glxtest/glxtest.cpp | 2 +-
