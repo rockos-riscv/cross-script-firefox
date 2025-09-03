@@ -1,40 +1,39 @@
-From b062bc1f656bc28a4c4f883f733f1f9d105f3ea4 Mon Sep 17 00:00:00 2001
-From: CHEN Xuan <chenxuan@iscas.ac.cn>
-Date: Tue, 1 Jul 2025 10:56:05 +0000
-Subject: [PATCH 11/12] crop videos with seperate pitch info
+From ce299c4882d24a6b82e82a5534afac3aea80a64e Mon Sep 17 00:00:00 2001
+From: Sakura286 <Sakura286>
+Date: Fri, 22 Aug 2025 06:44:33 +0000
+Subject: [PATCH 09/12] crop videos with seperate pitch info
 
 ---
- .../platforms/ffmpeg/FFmpegVideoFramePool.cpp | 61 ++++++-------------
- 1 file changed, 20 insertions(+), 41 deletions(-)
+ .../platforms/ffmpeg/FFmpegVideoFramePool.cpp | 59 ++++++-------------
+ 1 file changed, 19 insertions(+), 40 deletions(-)
 
 diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
-index aff0f9850b..d6afa1ceb4 100644
+index 516ac218cc..c655bc03ee 100644
 --- a/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
 +++ b/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
-@@ -276,17 +276,11 @@ static Maybe<VADRMPRIMESurfaceDescriptor> FFmpegDescToVA(
+@@ -423,17 +423,11 @@ static Maybe<VADRMPRIMESurfaceDescriptor> FFmpegDescToVA(
    vaDesc.width = aAVFrame->width;
    vaDesc.height = aAVFrame->height - aAVFrame->crop_bottom;
  
 -  // Native width and height before crop is applied
 -  unsigned int uncrop_width = aDesc.layers[0].planes[0].pitch;
 -  unsigned int uncrop_height = aAVFrame->height;
--
++  if (aDesc.layers[0].format == DRM_FORMAT_YUV420 ||
++      aDesc.layers[0].format == DRM_FORMAT_NV12) {
+ 
 -  unsigned int offset = aDesc.layers[0].planes[0].offset;
 -
 -  if (aDesc.layers[0].format == DRM_FORMAT_YUV420) {
--    vaDesc.fourcc = VA_FOURCC_YV12;
+-    vaDesc.fourcc = VA_FOURCC_I420;
 -
 -    // V4L2 expresses YUV420 as a single contiguous buffer containing
 -    // all three planes.  DMABufSurfaceYUV expects the three planes
-+  if (aDesc.layers[0].format == DRM_FORMAT_YUV420 ||
-+      aDesc.layers[0].format == DRM_FORMAT_NV12) {
-+    
 +    // V4L2 expresses YUV420/NV12 as a single contiguous buffer containing
 +    // all three/two planes.  DMABufSurfaceYUV expects the three planes
      // separately, so we have to split them out
      MOZ_ASSERT(aDesc.nb_objects == 1);
      MOZ_ASSERT(aDesc.nb_layers == 1);
-@@ -296,42 +290,27 @@ static Maybe<VADRMPRIMESurfaceDescriptor> FFmpegDescToVA(
+@@ -443,42 +437,27 @@ static Maybe<VADRMPRIMESurfaceDescriptor> FFmpegDescToVA(
      vaDesc.objects[0].size = aDesc.objects[0].size;
      vaDesc.objects[0].fd = aDesc.objects[0].fd;
  
@@ -65,12 +64,12 @@ index aff0f9850b..d6afa1ceb4 100644
 -    // to split them out
 -    MOZ_ASSERT(aDesc.nb_objects == 1);
 -    MOZ_ASSERT(aDesc.nb_layers == 1);
- 
+-
 -    vaDesc.num_objects = 1;
 -    vaDesc.objects[0].drm_format_modifier = aDesc.objects[0].format_modifier;
 -    vaDesc.objects[0].size = aDesc.objects[0].size;
 -    vaDesc.objects[0].fd = aDesc.objects[0].fd;
--
+ 
 -    vaDesc.num_layers = 2;
 -    for (int i = 0; i < 2; i++) {
 -      vaDesc.layers[i].num_planes = 1;

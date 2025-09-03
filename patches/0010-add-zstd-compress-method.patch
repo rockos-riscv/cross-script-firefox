@@ -1,14 +1,14 @@
-From 91701db3d9aa718170e2b2f253ead7f3b6da9725 Mon Sep 17 00:00:00 2001
+From ea9f51b11eff7d537296a78ae45d7a8bff5507ea Mon Sep 17 00:00:00 2001
 From: Sakura286 <Sakura286>
-Date: Wed, 18 Jun 2025 07:56:47 +0000
-Subject: [PATCH 12/12] add zstd compress method
+Date: Mon, 1 Sep 2025 08:04:07 +0000
+Subject: [PATCH 10/12] add zstd compress method
 
 ---
  toolkit/mozapps/installer/upload-files.mk | 8 +++++++-
  1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/toolkit/mozapps/installer/upload-files.mk b/toolkit/mozapps/installer/upload-files.mk
-index a53169a3e6..7e15e215cc 100644
+index f301e254e1..ad06febd1a 100644
 --- a/toolkit/mozapps/installer/upload-files.mk
 +++ b/toolkit/mozapps/installer/upload-files.mk
 @@ -10,7 +10,7 @@ ifndef MOZ_PKG_FORMAT
@@ -20,14 +20,14 @@ index a53169a3e6..7e15e215cc 100644
      else ifeq ($(MOZ_WIDGET_TOOLKIT),android)
          MOZ_PKG_FORMAT = APK
      else
-@@ -114,6 +114,12 @@ ifeq ($(MOZ_PKG_FORMAT),XZ)
-   INNER_UNMAKE_PACKAGE	= cd $(1) && xz --decompress --stdout $(UNPACKAGE) | $(UNPACK_TAR)
+@@ -109,6 +109,12 @@ ifeq ($(MOZ_PKG_FORMAT),XZ)
+   INNER_MAKE_PACKAGE 	= cd $(1) && $(CREATE_FINAL_TAR) - $(MOZ_PKG_DIR) | xz --compress --stdout -9 --extreme > $(PACKAGE)
  endif
  
 +ifeq ($(MOZ_PKG_FORMAT),ZST)
 +  PKG_SUFFIX = .tar.zst
-+  INNER_MAKE_PACKAGE 	= cd $(1) && $(CREATE_FINAL_TAR) - $(MOZ_PKG_DIR) | zstd -T0 > $(PACKAGE)
-+  INNER_UNMAKE_PACKAGE	= cd $(1) && zstd -T0 --decompress --stdout $(UNPACKAGE) | $(UNPACK_TAR)
++  INNER_MAKE_PACKAGE   = cd $(1) && $(CREATE_FINAL_TAR) - $(MOZ_PKG_DIR) | zstd -T0 > $(PACKAGE)
++  INNER_UNMAKE_PACKAGE = cd $(1) && zstd -T0 --decompress --stdout $(UNPACKAGE) | $(UNPACK_TAR)
 +endif
 +
  ifeq ($(MOZ_PKG_FORMAT),BZ2)

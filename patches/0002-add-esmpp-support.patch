@@ -1,6 +1,6 @@
-From 260fb0e66f16da0239e30d89136244bfbf7f8b32 Mon Sep 17 00:00:00 2001
+From 818356063ac2dc659afa7d51a15d4fd31faf0398 Mon Sep 17 00:00:00 2001
 From: Sakura286 <Sakura286>
-Date: Wed, 18 Jun 2025 03:47:21 +0000
+Date: Fri, 22 Aug 2025 04:03:38 +0000
 Subject: [PATCH 02/12] add esmpp support
 
 ---
@@ -9,10 +9,10 @@ Subject: [PATCH 02/12] add esmpp support
  2 files changed, 134 insertions(+), 1 deletion(-)
 
 diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
-index 65a736fc48..6ddd9d4268 100644
+index 031727a20c..176ae05a48 100644
 --- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
 +++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
-@@ -22,6 +22,11 @@
+@@ -23,6 +23,11 @@
  #if LIBAVCODEC_VERSION_MAJOR >= 58
  #  include "mozilla/ProfilerMarkers.h"
  #endif
@@ -24,7 +24,7 @@ index 65a736fc48..6ddd9d4268 100644
  #ifdef MOZ_USE_HWDECODE
  #  include "H264.h"
  #  include "H265.h"
-@@ -31,6 +36,7 @@
+@@ -32,6 +37,7 @@
  #  include "mozilla/layers/DMABUFSurfaceImage.h"
  #  include "FFmpegVideoFramePool.h"
  #  include "va/va.h"
@@ -32,7 +32,7 @@ index 65a736fc48..6ddd9d4268 100644
  #endif
  
  #if defined(MOZ_AV1) && \
-@@ -52,6 +58,7 @@
+@@ -53,6 +59,7 @@
  #  define AV_PIX_FMT_GBRP10LE PIX_FMT_GBRP10LE
  #  define AV_PIX_FMT_NONE PIX_FMT_NONE
  #  define AV_PIX_FMT_VAAPI_VLD PIX_FMT_VAAPI_VLD
@@ -40,7 +40,7 @@ index 65a736fc48..6ddd9d4268 100644
  #endif
  #if LIBAVCODEC_VERSION_MAJOR > 58
  #  define AV_PIX_FMT_VAAPI_VLD AV_PIX_FMT_VAAPI
-@@ -150,6 +157,8 @@ static AVPixelFormat ChoosePixelFormat(AVCodecContext* aCodecContext,
+@@ -152,6 +159,8 @@ static AVPixelFormat ChoosePixelFormat(AVCodecContext* aCodecContext,
        case AV_PIX_FMT_GBRP10LE:
          FFMPEGV_LOG("Requesting pixel format GBRP10LE.");
          return AV_PIX_FMT_GBRP10LE;
@@ -49,7 +49,7 @@ index 65a736fc48..6ddd9d4268 100644
        default:
          break;
      }
-@@ -192,6 +201,22 @@ static AVPixelFormat ChooseV4L2PixelFormat(AVCodecContext* aCodecContext,
+@@ -194,6 +203,22 @@ static AVPixelFormat ChooseV4L2PixelFormat(AVCodecContext* aCodecContext,
    return AV_PIX_FMT_NONE;
  }
  
@@ -72,7 +72,7 @@ index 65a736fc48..6ddd9d4268 100644
  static AVPixelFormat ChooseD3D11VAPixelFormat(AVCodecContext* aCodecContext,
                                                const AVPixelFormat* aFormats) {
  #  ifdef MOZ_ENABLE_D3D11VA
-@@ -461,6 +486,55 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2Decoder() {
+@@ -435,6 +460,55 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2Decoder() {
    releaseDecoder.release();
    return NS_OK;
  }
@@ -128,7 +128,7 @@ index 65a736fc48..6ddd9d4268 100644
  #endif
  
  #if LIBAVCODEC_VERSION_MAJOR < 58
-@@ -505,6 +579,7 @@ bool FFmpegVideoDecoder<LIBAV_VER>::ShouldEnableLinuxHWDecoding() const {
+@@ -479,6 +553,7 @@ bool FFmpegVideoDecoder<LIBAV_VER>::ShouldEnableLinuxHWDecoding() const {
    switch (mCodecID) {
      case AV_CODEC_ID_H264:
        supported = gfx::gfxVars::UseH264HwDecode();
@@ -136,7 +136,7 @@ index 65a736fc48..6ddd9d4268 100644
        break;
      case AV_CODEC_ID_VP8:
        supported = gfx::gfxVars::UseVP8HwDecode();
-@@ -598,6 +673,12 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWDecoderIfAllowed() {
+@@ -588,6 +663,12 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWDecoderIfAllowed() {
    }
  #  endif  // MOZ_ENABLE_V4L2
  
@@ -149,7 +149,7 @@ index 65a736fc48..6ddd9d4268 100644
  #  ifdef MOZ_ENABLE_D3D11VA
    if (XRE_IsGPUProcess() && NS_SUCCEEDED(InitD3D11VADecoder())) {
      return;
-@@ -955,6 +1036,8 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWCodecContext(ContextType aType) {
+@@ -971,6 +1052,8 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWCodecContext(ContextType aType) {
      mCodecContext->get_format = ChooseV4L2PixelFormat;
    } else if (aType == ContextType::VAAPI) {
      mCodecContext->get_format = ChooseVAAPIPixelFormat;
@@ -158,7 +158,7 @@ index 65a736fc48..6ddd9d4268 100644
    } else {
      MOZ_DIAGNOSTIC_ASSERT(aType == ContextType::D3D11VA);
      mCodecContext->get_format = ChooseD3D11VAPixelFormat;
-@@ -1176,6 +1259,9 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::DoDecode(
+@@ -1192,6 +1275,9 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::DoDecode(
        if (mUsingV4L2) {
          rv = CreateImageV4L2(mFrame->pkt_pos, GetFramePts(mFrame),
                               Duration(mFrame), aResults);
@@ -168,7 +168,7 @@ index 65a736fc48..6ddd9d4268 100644
        } else {
          rv = CreateImageVAAPI(mFrame->pkt_pos, GetFramePts(mFrame),
                                Duration(mFrame), aResults);
-@@ -1683,6 +1769,48 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::CreateImageV4L2(
+@@ -1757,6 +1843,48 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::CreateImageV4L2(
    aResults.AppendElement(std::move(vp));
    return NS_OK;
  }
@@ -217,7 +217,7 @@ index 65a736fc48..6ddd9d4268 100644
  #endif
  
  RefPtr<MediaDataDecoder::FlushPromise>
-@@ -1753,7 +1881,7 @@ void FFmpegVideoDecoder<LIBAV_VER>::ProcessShutdown() {
+@@ -1838,7 +1966,7 @@ void FFmpegVideoDecoder<LIBAV_VER>::ProcessShutdown() {
  bool FFmpegVideoDecoder<LIBAV_VER>::IsHardwareAccelerated(
      nsACString& aFailureReason) const {
  #if defined(MOZ_USE_HWDECODE) && defined(MOZ_WIDGET_GTK)
@@ -227,10 +227,10 @@ index 65a736fc48..6ddd9d4268 100644
    return !!mD3D11VADeviceContext;
  #else
 diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
-index 7705811983..ae5d23009c 100644
+index 0aecea003a..ebd35c50f5 100644
 --- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
 +++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
-@@ -150,6 +150,7 @@ class FFmpegVideoDecoder<LIBAV_VER>
+@@ -159,6 +159,7 @@ class FFmpegVideoDecoder<LIBAV_VER>
      D3D11VA,
      VAAPI,
      V4L2,
@@ -238,15 +238,15 @@ index 7705811983..ae5d23009c 100644
    };
    void InitHWCodecContext(ContextType aType);
  
-@@ -176,6 +177,7 @@ class FFmpegVideoDecoder<LIBAV_VER>
-   bool ShouldEnableLinuxHWDecoding() const;
+@@ -186,6 +187,7 @@ class FFmpegVideoDecoder<LIBAV_VER>
+   bool IsLinuxHDR() const;
    MediaResult InitVAAPIDecoder();
    MediaResult InitV4L2Decoder();
 +  MediaResult InitEsmppDecoder();
    bool CreateVAAPIDeviceContext();
-   AVCodec* FindVAAPICodec();
    bool GetVAAPISurfaceDescriptor(VADRMPRIMESurfaceDescriptor* aVaDesc);
-@@ -188,10 +190,13 @@ class FFmpegVideoDecoder<LIBAV_VER>
+   void AddAcceleratedFormats(nsTArray<AVCodecID>& aCodecList,
+@@ -197,10 +199,13 @@ class FFmpegVideoDecoder<LIBAV_VER>
                                 MediaDataDecoder::DecodedData& aResults);
    MediaResult CreateImageV4L2(int64_t aOffset, int64_t aPts, int64_t aDuration,
                                MediaDataDecoder::DecodedData& aResults);
@@ -257,9 +257,9 @@ index 7705811983..ae5d23009c 100644
    AVBufferRef* mVAAPIDeviceContext = nullptr;
    bool mUsingV4L2 = false;
 +  bool mUsingEsmpp = false;
-   VADisplay mDisplay = nullptr;
-   UniquePtr<VideoFramePool<LIBAV_VER>> mVideoFramePool;
-   static nsTArray<AVCodecID> mAcceleratedFormats;
+   // If video overlay is used we want to upload SW decoded frames to
+   // DMABuf and present it as a external texture to rendering pipeline.
+   bool mUploadSWDecodeToDMABuf = false;
 -- 
 2.43.0
 

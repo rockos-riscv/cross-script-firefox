@@ -1,6 +1,6 @@
-From 919d6670b25653fc3cbecc801f6b02eac24dde09 Mon Sep 17 00:00:00 2001
+From 19ea45f119475a7f8f124f63e02a8ea7283f7efd Mon Sep 17 00:00:00 2001
 From: Sakura286 <Sakura286>
-Date: Wed, 18 Jun 2025 03:51:13 +0000
+Date: Fri, 22 Aug 2025 04:07:03 +0000
 Subject: [PATCH 04/12] enlarge extra_hw_frames for h26x
 
 ---
@@ -8,10 +8,10 @@ Subject: [PATCH 04/12] enlarge extra_hw_frames for h26x
  1 file changed, 8 insertions(+)
 
 diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
-index 6ddd9d4268..14653ac501 100644
+index 176ae05a48..4135a8e6b9 100644
 --- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
 +++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
-@@ -1044,11 +1044,19 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWCodecContext(ContextType aType) {
+@@ -1060,11 +1060,19 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWCodecContext(ContextType aType) {
    }
  
    if (mCodecID == AV_CODEC_ID_H264) {

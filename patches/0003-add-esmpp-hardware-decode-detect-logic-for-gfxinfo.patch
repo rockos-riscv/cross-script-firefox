@@ -1,6 +1,6 @@
-From 37185631faba9c8c30fbbe64b720ccd85d77f8a9 Mon Sep 17 00:00:00 2001
+From 06408fccd6b0b500ebc5df155a03bf37b566154e Mon Sep 17 00:00:00 2001
 From: Sakura286 <Sakura286>
-Date: Wed, 18 Jun 2025 03:48:54 +0000
+Date: Fri, 22 Aug 2025 04:06:21 +0000
 Subject: [PATCH 03/12] add esmpp hardware decode detect logic for gfxinfo
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH 03/12] add esmpp hardware decode detect logic for gfxinfo
  2 files changed, 23 insertions(+), 2 deletions(-)
 
 diff --git a/widget/gtk/GfxInfo.cpp b/widget/gtk/GfxInfo.cpp
-index 87a96802d9..08eb7ab22b 100644
+index 8913d2db4d..131133ef83 100644
 --- a/widget/gtk/GfxInfo.cpp
 +++ b/widget/gtk/GfxInfo.cpp
 @@ -41,10 +41,12 @@
@@ -25,7 +25,7 @@ index 87a96802d9..08eb7ab22b 100644
  
  namespace mozilla::widget {
  
-@@ -836,6 +838,19 @@ void GfxInfo::V4L2ProbeDevice(nsCString& dev) {
+@@ -852,6 +854,19 @@ void GfxInfo::V4L2ProbeDevice(nsCString& dev) {
    }
  }
  
@@ -42,10 +42,10 @@ index 87a96802d9..08eb7ab22b 100644
 +      media::MediaCodecsSupport::H264HardwareDecode);
 +}
 +
- const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
+ const nsTArray<RefPtr<GfxDriverInfo>>& GfxInfo::GetGfxDriverInfo() {
    if (!sDriverInfo->Length()) {
      // Mesa 10.0 provides the GLX_MESA_query_renderer extension, which allows us
-@@ -1306,7 +1321,8 @@ nsresult GfxInfo::GetFeatureStatusImpl(
+@@ -1347,7 +1362,8 @@ nsresult GfxInfo::GetFeatureStatusImpl(
        continue;
      }
      if ((mVAAPISupportedCodecs & pair.mCodec) ||
@@ -55,7 +55,7 @@ index 87a96802d9..08eb7ab22b 100644
        *aStatus = nsIGfxInfo::FEATURE_STATUS_OK;
      } else {
        *aStatus = nsIGfxInfo::FEATURE_BLOCKED_PLATFORM_TEST;
-@@ -1330,11 +1346,13 @@ nsresult GfxInfo::GetFeatureStatusImpl(
+@@ -1371,11 +1387,13 @@ nsresult GfxInfo::GetFeatureStatusImpl(
      if (probeHWDecode) {
        GetDataVAAPI();
        GetDataV4L2();
@@ -71,10 +71,10 @@ index 87a96802d9..08eb7ab22b 100644
        aFailureId = "FEATURE_FAILURE_VIDEO_DECODING_TEST_FAILED";
      }
 diff --git a/widget/gtk/GfxInfo.h b/widget/gtk/GfxInfo.h
-index 26b4554b4a..a72a1d09d7 100644
+index e67dacd411..d274c94530 100644
 --- a/widget/gtk/GfxInfo.h
 +++ b/widget/gtk/GfxInfo.h
-@@ -121,12 +121,15 @@ class GfxInfo final : public GfxInfoBase {
+@@ -129,6 +129,8 @@ class GfxInfo final : public GfxInfoBase {
    int mVAAPISupportedCodecs = 0;
    mozilla::Maybe<bool> mIsV4L2Supported;
    int mV4L2SupportedCodecs = 0;
@@ -83,6 +83,7 @@ index 26b4554b4a..a72a1d09d7 100644
  
    static int sGLXTestPipe;
    static pid_t sGLXTestPID;
+@@ -139,6 +141,7 @@ class GfxInfo final : public GfxInfoBase {
  
    void GetDataVAAPI();
    void GetDataV4L2();

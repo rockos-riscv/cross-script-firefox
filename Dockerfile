@@ -1,11 +1,12 @@
 FROM ubuntu:noble
 
-MAINTAINER CHEN Xuan
-
 ARG WORKSPACE=/workspace
-ARG FIREFOX_DIR=$WORKSPACE/firefox-137.0.2
+ARG FIREFOX_DIR=$WORKSPACE/firefox-142.0.1
 ARG SCRIPT_DIR=$WORKSPACE/eswin-scripts
 ARG SYSROOT_DIR=$WORKSPACE/sysroot
+
+ARG USER_EMAIL=chenxuan@iscas.ac.cn
+ARG USER_NAME='CHEN Xuan'
 
 USER root
 
@@ -18,20 +19,32 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt update && \
     DEBIAN_FRONTEND=noninteractive apt install -y \
-        devscripts build-essential clang lld nodejs cbindgen m4 git multistrap pkg-config
+        devscripts build-essential clang lld nodejs cbindgen m4 git multistrap pkg-config gnutls-bin
 
 # Prepare Rust
+## # System cbindgen is 0.26.0, which is too old
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
     . "$HOME/.cargo/env" && \
-    rustup target add riscv64gc-unknown-linux-gnu
+    rustup target add riscv64gc-unknown-linux-gnu && \
+    apt remove -y cbindgen && cargo install cbindgen --force
+
+RUN git config --global user.email $USER_EMAIL && \
+    git config --global user.name $USER_NAME && \
+    git config --global http.version HTTP/1.1 && \
+    git config --global http.postBuffer 1048576000 && \
+    git config --global https.postBuffer 1048576000 && \
+    git config --global http.sslVerify false
 
 # Prepare sysroot
-RUN git clone --depth=1 --branch=137-orig https://github.com/rockos-riscv/cross-script-firefox $SCRIPT_DIR && \
+##
+RUN git clone --depth=1 --branch=142.0.1 https://github.com/rockos-riscv/cross-script-firefox $SCRIPT_DIR && \
     patch -p0 /usr/sbin/multistrap $SCRIPT_DIR/multistrap-auth.patch && \
-    multistrap -a riscv64 -d $SYSROOT_DIR -f $SCRIPT_DIR/sysroot-riscv64.conf
+    multistrap -a riscv64 -d $SYSROOT_DIR -f $SCRIPT_DIR/sysroot-riscv64.conf && \
+    rm $SYSROOT_DIR/lib -rf && \
+    ln -s usr/lib $SYSROOT_DIR/lib
 
 # Get Firefox Source Code
-RUN dget -u https://snapshot.debian.org/archive/debian/20250416T084123Z/pool/main/f/firefox/firefox_137.0.2-1.dsc
+RUN git clone --branch=debian/142.0.1-1 https://salsa.debian.org/mozilla-team/firefox.git $FIREFOX_DIR
 
 # Create Mozconfig
 WORKDIR $FIREFOX_DIR
@@ -66,4 +79,4 @@ EOF
 RUN ./mach configure
 RUN ./mach build -j$(nproc)
 RUN ./mach package
-# The target tarball path is obj-riscv64-unknown-linux-gnu/dist/firefox-131.0.2.en-US.linux-riscv64.tar.bz2
+# The target tarball path is obj-riscv64-unknown-linux-gnu/dist/firefox-142.0.en-US.linux-riscv64.tar.zst

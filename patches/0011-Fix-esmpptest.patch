@@ -1,0 +1,72 @@
+From 3500cc37e6f2ea402bb9dca0ecd766b74d0d7708 Mon Sep 17 00:00:00 2001
+From: Sakura286 <Sakura286>
+Date: Mon, 1 Sep 2025 08:04:44 +0000
+Subject: [PATCH 11/12] Fix esmpptest
+
+    * Firefox changed HEVC decoding flag
+    * Esmpp changed API
+---
+ widget/gtk/esmpptest/esmpptest.cpp | 19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/widget/gtk/esmpptest/esmpptest.cpp b/widget/gtk/esmpptest/esmpptest.cpp
+index bc0a3d1264..4e21d64c14 100644
+--- a/widget/gtk/esmpptest/esmpptest.cpp
++++ b/widget/gtk/esmpptest/esmpptest.cpp
+@@ -34,18 +34,22 @@ using EsMppCodingType = enum {
+   MPP_VIDEO_CodingHEVC = 0x1000004,
+ };
+ 
++// 137~142, CODEC_HW_HEVC change to CODEC_HW_DEC_HEVC,
++// Value changed from 1 << 8 to 1 << 12
+ using HwAccelCodec = enum {
+   CODEC_HW_H264 = 1 << 4,
+-  CODEC_HW_HEVC = 1 << 8,
++  CODEC_HW_HEVC = 1 << 12,
+ };
+ 
+-using create_handle = int (*)(EsMppCtx *ctx, EsMppCtxType, EsMppCodingType, int);
++using create_handle = int (*)(EsMppCtx *ctx, EsMppCtxType, EsMppCodingType);
+ using destroy_handle = int (*)(EsMppCtx);
++using selectdev_handle = int (*)(EsMppCtx ctx, int, int);
+ using init_handle = int (*)(EsMppCtx);
+ using deinit_handle = int (*)(EsMppCtx);
+ 
+ void* EsMpp;
+ create_handle EsMppCreate;
++selectdev_handle EsMppSelect_Dev;
+ destroy_handle EsMppDestroy;
+ init_handle EsMppInit;
+ deinit_handle EsMppDeinit;
+@@ -89,6 +93,10 @@ int main(int argc, char** argv) {
+   if(!EsMppCreate){
+     return fail("Can not bind esmpp_create");
+   }
++  EsMppSelect_Dev = reinterpret_cast<selectdev_handle>(dlsym(EsMpp,"esmpp_select_dev"));
++  if(!EsMppSelect_Dev) {
++    return fail("Can not select dev");
++  }
+   EsMppInit = reinterpret_cast<init_handle>(dlsym(EsMpp, "esmpp_init"));
+   if(!EsMppInit){
+     return fail("Can not bind esmpp_init");
+@@ -108,11 +116,16 @@ int main(int argc, char** argv) {
+     EsMppCtx esmppctx = nullptr;
+     int mppret = 0;
+ 
+-    if ((mppret = EsMppCreate(&esmppctx, MPP_CTX_DEC, esmppcodings[i], 0))) {
++    if ((mppret = EsMppCreate(&esmppctx, MPP_CTX_DEC, esmppcodings[i]))) {
+       log("Can not create esmpp context for codec id %d, MPP_RET is %d\n", esmppcodings[i], mppret);
+       continue;
+     }
+ 
++    if ((mppret = EsMppSelect_Dev(esmppctx, 0, 0))) {
++      log("Can not select dev: 0 die: 0, MPP_RET is %d\n", mppret);
++      continue;
++    }
++
+     if((mppret = EsMppInit(esmppctx))) {
+       log("EsMpp can not init codec id %d, MPP_RET is %d\n", esmppcodings[i], mppret);
+       continue;
+-- 
+2.43.0
+
