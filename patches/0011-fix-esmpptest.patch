@@ -1,10 +1,8 @@
-From 3500cc37e6f2ea402bb9dca0ecd766b74d0d7708 Mon Sep 17 00:00:00 2001
-From: Sakura286 <Sakura286>
-Date: Mon, 1 Sep 2025 08:04:44 +0000
-Subject: [PATCH 11/12] Fix esmpptest
+From c801bd4b274807d08d824abfa4b84c95a3546275 Mon Sep 17 00:00:00 2001
+From: CHEN <chenxuan@iscas.ac.cn>
+Date: Thu, 16 Oct 2025 10:00:05 +0000
+Subject: [PATCH 11/12] fix esmpptest
 
-    * Firefox changed HEVC decoding flag
-    * Esmpp changed API
 ---
  widget/gtk/esmpptest/esmpptest.cpp | 19 ++++++++++++++++---
  1 file changed, 16 insertions(+), 3 deletions(-)
@@ -68,5 +66,5 @@ index bc0a3d1264..4e21d64c14 100644
        log("EsMpp can not init codec id %d, MPP_RET is %d\n", esmppcodings[i], mppret);
        continue;
 -- 
-2.43.0
+2.48.1
 

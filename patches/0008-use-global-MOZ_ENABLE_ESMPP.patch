@@ -1,6 +1,6 @@
-From c2ecd9f829f1aabb2568ff80e91846a0e6b05ba3 Mon Sep 17 00:00:00 2001
-From: Sakura286 <Sakura286>
-Date: Fri, 22 Aug 2025 06:34:55 +0000
+From b4ec2c614cd80b9400a8912ac3c6d4c8360797a0 Mon Sep 17 00:00:00 2001
+From: CHEN <chenxuan@iscas.ac.cn>
+Date: Thu, 16 Oct 2025 09:57:59 +0000
 Subject: [PATCH 08/12] use global MOZ_ENABLE_ESMPP
 
 ---
@@ -8,18 +8,18 @@ Subject: [PATCH 08/12] use global MOZ_ENABLE_ESMPP
  1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
-index 4135a8e6b9..07e3313e03 100644
+index 498e1e3e22..40626736f4 100644
 --- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
 +++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
-@@ -37,7 +37,6 @@
+@@ -45,7 +45,6 @@
+ #  include "mozilla/gfx/gfxVars.h"
  #  include "mozilla/layers/DMABUFSurfaceImage.h"
- #  include "FFmpegVideoFramePool.h"
  #  include "va/va.h"
 -#define ES_MPP 1
  #endif
  
  #if defined(MOZ_AV1) && \
-@@ -1060,14 +1059,14 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWCodecContext(ContextType aType) {
+@@ -1125,14 +1124,14 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWCodecContext(ContextType aType) {
    }
  
    if (mCodecID == AV_CODEC_ID_H264) {
@@ -37,5 +37,5 @@ index 4135a8e6b9..07e3313e03 100644
          H265::ComputeMaxRefFrames(mInfo.mExtraData);
  #else
 -- 
-2.43.0
+2.48.1
 

@@ -1,7 +1,7 @@
-From 892112558a8dfc57cb4fcd4fceffb0866926820c Mon Sep 17 00:00:00 2001
-From: Sakura286 <Sakura286>
-Date: Wed, 3 Sep 2025 02:15:35 +0000
-Subject: [PATCH 12/12] Detect PVR on startup
+From 974f6115d876f1771b64d33ac3f361d52fb86dc3 Mon Sep 17 00:00:00 2001
+From: CHEN <chenxuan@iscas.ac.cn>
+Date: Thu, 16 Oct 2025 10:00:32 +0000
+Subject: [PATCH 12/12] detect PVR on startup
 
 ---
  dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp | 15 +++++++++++++++
@@ -11,10 +11,10 @@ Subject: [PATCH 12/12] Detect PVR on startup
  4 files changed, 31 insertions(+)
 
 diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
-index 07e3313e03..9c36380069 100644
+index 40626736f4..1a97efe405 100644
 --- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
 +++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
-@@ -292,6 +292,11 @@ void FFmpegVideoDecoder<LIBAV_VER>::AdjustHWDecodeLogging() {
+@@ -344,6 +344,11 @@ void FFmpegVideoDecoder<LIBAV_VER>::AdjustHWDecodeLogging() {
  MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitVAAPIDecoder() {
    FFMPEG_LOG("Initialising VA-API FFmpeg decoder");
  
@@ -26,7 +26,7 @@ index 07e3313e03..9c36380069 100644
    StaticMutexAutoLock mon(sMutex);
  
    // mAcceleratedFormats is already configured so check supported
-@@ -462,6 +467,16 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2Decoder() {
+@@ -506,6 +511,16 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2Decoder() {
  
  MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitEsmppDecoder() {
    FFMPEG_LOG("Initialising esmpp-DRM FFmpeg decoder");
@@ -44,7 +44,7 @@ index 07e3313e03..9c36380069 100644
  
    // Select the appropriate esmpp codec
 diff --git a/gfx/config/gfxFeature.h b/gfx/config/gfxFeature.h
-index a92eda502e..1cb567c20c 100644
+index 4af695581f..c6ebe7dc22 100644
 --- a/gfx/config/gfxFeature.h
 +++ b/gfx/config/gfxFeature.h
 @@ -41,6 +41,7 @@ namespace gfx {
@@ -56,10 +56,10 @@ index a92eda502e..1cb567c20c 100644
    _(VIDEO_SOFTWARE_OVERLAY, Feature, "software decoded video overlay")       \
    _(HW_DECODED_VIDEO_ZERO_COPY, Feature, "Hardware decoded video zero copy") \
 diff --git a/gfx/config/gfxVars.h b/gfx/config/gfxVars.h
-index 68f4de0f09..f10acc4f04 100644
+index ca3cae1a94..4642a872f7 100644
 --- a/gfx/config/gfxVars.h
 +++ b/gfx/config/gfxVars.h
-@@ -34,6 +34,7 @@ class gfxVarReceiver;
+@@ -35,6 +35,7 @@ class MOZ_STACK_CLASS gfxVarsCollectUpdates;
    _(RequiresAcceleratedGLContextForCompositorOGL, bool, false)     \
    _(CanUseHardwareVideoDecoding, bool, false)                      \
    _(CanUseHardwareVideoEncoding, bool, false)                      \
@@ -68,10 +68,10 @@ index 68f4de0f09..f10acc4f04 100644
    _(DXNV12Blocked, bool, false)                                    \
    _(DXP010Blocked, bool, false)                                    \
 diff --git a/gfx/thebes/gfxPlatform.cpp b/gfx/thebes/gfxPlatform.cpp
-index 1abbb083a0..1fbc6dab14 100644
+index d04e7403f4..06ecf88085 100644
 --- a/gfx/thebes/gfxPlatform.cpp
 +++ b/gfx/thebes/gfxPlatform.cpp
-@@ -3061,12 +3061,26 @@ void gfxPlatform::InitHardwareVideoConfig() {
+@@ -3063,12 +3063,26 @@ void gfxPlatform::InitHardwareVideoConfig() {
                              "FEATURE_FAILURE_SANITY_TEST_FAILED"_ns);
    }
  
@@ -99,5 +99,5 @@ index 1abbb083a0..1fbc6dab14 100644
  #define CODEC_HW_FEATURE_SETUP(name)                                           \
    FeatureState& featureDec##name =                                             \
 -- 
-2.43.0
+2.48.1
 

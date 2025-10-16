@@ -1,6 +1,6 @@
-From ce299c4882d24a6b82e82a5534afac3aea80a64e Mon Sep 17 00:00:00 2001
-From: Sakura286 <Sakura286>
-Date: Fri, 22 Aug 2025 06:44:33 +0000
+From 9a273a72c2e5b14a570e13863d78c99cabb8eb9f Mon Sep 17 00:00:00 2001
+From: CHEN <chenxuan@iscas.ac.cn>
+Date: Thu, 16 Oct 2025 09:58:29 +0000
 Subject: [PATCH 09/12] crop videos with seperate pitch info
 
 ---
@@ -8,10 +8,10 @@ Subject: [PATCH 09/12] crop videos with seperate pitch info
  1 file changed, 19 insertions(+), 40 deletions(-)
 
 diff --git a/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp b/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
-index 516ac218cc..c655bc03ee 100644
+index a8e912dac4..4eb498e457 100644
 --- a/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
 +++ b/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
-@@ -423,17 +423,11 @@ static Maybe<VADRMPRIMESurfaceDescriptor> FFmpegDescToVA(
+@@ -424,17 +424,11 @@ static Maybe<VADRMPRIMESurfaceDescriptor> FFmpegDescToVA(
    vaDesc.width = aAVFrame->width;
    vaDesc.height = aAVFrame->height - aAVFrame->crop_bottom;
  
@@ -33,7 +33,7 @@ index 516ac218cc..c655bc03ee 100644
      // separately, so we have to split them out
      MOZ_ASSERT(aDesc.nb_objects == 1);
      MOZ_ASSERT(aDesc.nb_layers == 1);
-@@ -443,42 +437,27 @@ static Maybe<VADRMPRIMESurfaceDescriptor> FFmpegDescToVA(
+@@ -444,42 +438,27 @@ static Maybe<VADRMPRIMESurfaceDescriptor> FFmpegDescToVA(
      vaDesc.objects[0].size = aDesc.objects[0].size;
      vaDesc.objects[0].fd = aDesc.objects[0].fd;
  
@@ -92,5 +92,5 @@ index 516ac218cc..c655bc03ee 100644
      DMABUF_LOG("Don't know how to deal with FOURCC 0x%x",
                 aDesc.layers[0].format);
 -- 
-2.43.0
+2.48.1
 

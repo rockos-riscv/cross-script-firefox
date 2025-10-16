@@ -1,6 +1,6 @@
-From b1caf8dd453af93e08034df76cc8f53f7a7fbae4 Mon Sep 17 00:00:00 2001
-From: Sakura286 <Sakura286>
-Date: Fri, 22 Aug 2025 06:34:24 +0000
+From 9918003a120cea807662a6dbbeeee90e6401ab50 Mon Sep 17 00:00:00 2001
+From: CHEN <chenxuan@iscas.ac.cn>
+Date: Thu, 16 Oct 2025 09:56:55 +0000
 Subject: [PATCH 07/12] stop blocking some devices from vaapi acceleration
 
 ---
@@ -8,10 +8,10 @@ Subject: [PATCH 07/12] stop blocking some devices from vaapi acceleration
  1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/widget/gtk/GfxInfo.cpp b/widget/gtk/GfxInfo.cpp
-index 82530e4e61..b040a4f687 100644
+index a285803acb..6bbe3dd208 100644
 --- a/widget/gtk/GfxInfo.cpp
 +++ b/widget/gtk/GfxInfo.cpp
-@@ -1196,12 +1196,12 @@ const nsTArray<RefPtr<GfxDriverInfo>>& GfxInfo::GetGfxDriverInfo() {
+@@ -1215,12 +1215,12 @@ const nsTArray<RefPtr<GfxDriverInfo>>& GfxInfo::GetGfxDriverInfo() {
          V(0, 0, 0, 0), "FEATURE_HARDWARE_VIDEO_DECODING_NO_LINUX_AMD", "");
  
      // Disable on r600 driver due to decoding artifacts (Bug 1824307)
@@ -31,5 +31,5 @@ index 82530e4e61..b040a4f687 100644
      // Disable on AMD devices using broken Mesa (Bug 1837140).
      // https://gitlab.freedesktop.org/mesa/mesa/-/commit/0c024bbe641b092bbb
 -- 
-2.43.0
+2.48.1
 

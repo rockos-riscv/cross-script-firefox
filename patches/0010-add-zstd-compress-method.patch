@@ -1,6 +1,6 @@
-From ea9f51b11eff7d537296a78ae45d7a8bff5507ea Mon Sep 17 00:00:00 2001
-From: Sakura286 <Sakura286>
-Date: Mon, 1 Sep 2025 08:04:07 +0000
+From 44f4b65eadce13e414730533ae5d7c0a85f85162 Mon Sep 17 00:00:00 2001
+From: CHEN <chenxuan@iscas.ac.cn>
+Date: Thu, 16 Oct 2025 09:59:41 +0000
 Subject: [PATCH 10/12] add zstd compress method
 
 ---
@@ -8,7 +8,7 @@ Subject: [PATCH 10/12] add zstd compress method
  1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/toolkit/mozapps/installer/upload-files.mk b/toolkit/mozapps/installer/upload-files.mk
-index f301e254e1..ad06febd1a 100644
+index 09a33095f0..1e0cd331f4 100644
 --- a/toolkit/mozapps/installer/upload-files.mk
 +++ b/toolkit/mozapps/installer/upload-files.mk
 @@ -10,7 +10,7 @@ ifndef MOZ_PKG_FORMAT
@@ -20,8 +20,8 @@ index f301e254e1..ad06febd1a 100644
      else ifeq ($(MOZ_WIDGET_TOOLKIT),android)
          MOZ_PKG_FORMAT = APK
      else
-@@ -109,6 +109,12 @@ ifeq ($(MOZ_PKG_FORMAT),XZ)
-   INNER_MAKE_PACKAGE 	= cd $(1) && $(CREATE_FINAL_TAR) - $(MOZ_PKG_DIR) | xz --compress --stdout -9 --extreme > $(PACKAGE)
+@@ -110,6 +110,12 @@ ifeq ($(MOZ_PKG_FORMAT),XZ)
+   INNER_MAKE_PACKAGE 	= cd $(1) && $(CREATE_FINAL_TAR) - $(MOZ_PKG_DIR) | xz --compress --stdout $(if $(MOZ_PROFILE_USE),-9 --extreme) > $(PACKAGE)
  endif
  
 +ifeq ($(MOZ_PKG_FORMAT),ZST)
@@ -34,5 +34,5 @@ index f301e254e1..ad06febd1a 100644
    PKG_SUFFIX	= .tar.bz2
    ifeq (cocoa,$(MOZ_WIDGET_TOOLKIT))
 -- 
-2.43.0
+2.48.1
 

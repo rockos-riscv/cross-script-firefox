@@ -1,7 +1,7 @@
-FROM ubuntu:noble
+FROM ubuntu:plucky
 
 ARG WORKSPACE=/workspace
-ARG FIREFOX_DIR=$WORKSPACE/firefox-142.0.1
+ARG FIREFOX_DIR=$WORKSPACE/firefox-144.0
 ARG SCRIPT_DIR=$WORKSPACE/eswin-scripts
 ARG SYSROOT_DIR=$WORKSPACE/sysroot
 
@@ -19,7 +19,7 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt update && \
     DEBIAN_FRONTEND=noninteractive apt install -y \
-        devscripts build-essential clang lld nodejs cbindgen m4 git multistrap pkg-config gnutls-bin
+        devscripts build-essential clang libclang-dev lld nodejs cbindgen m4 git multistrap pkg-config gnutls-bin
 
 # Prepare Rust
 ## # System cbindgen is 0.26.0, which is too old
@@ -37,19 +37,17 @@ RUN git config --global user.email $USER_EMAIL && \
 
 # Prepare sysroot
 ##
-RUN git clone --depth=1 --branch=142.0.1 https://github.com/rockos-riscv/cross-script-firefox $SCRIPT_DIR && \
+RUN git clone --depth=1 --branch=144.0 https://github.com/rockos-riscv/cross-script-firefox $SCRIPT_DIR && \
     patch -p0 /usr/sbin/multistrap $SCRIPT_DIR/multistrap-auth.patch && \
     multistrap -a riscv64 -d $SYSROOT_DIR -f $SCRIPT_DIR/sysroot-riscv64.conf && \
     rm $SYSROOT_DIR/lib -rf && \
     ln -s usr/lib $SYSROOT_DIR/lib
 
 # Get Firefox Source Code
-RUN git clone --branch=debian/142.0.1-1 https://salsa.debian.org/mozilla-team/firefox.git $FIREFOX_DIR
+RUN git clone --branch=debian/144.0-1 https://salsa.debian.org/mozilla-team/firefox.git $FIREFOX_DIR
 
 # Create Mozconfig
 WORKDIR $FIREFOX_DIR
-## patchset
-RUN for i in $(ls $SCRIPT_DIR/patches); do patch -p1 < $SCRIPT_DIR/patches/$i; done
 ## configuration
 RUN <<EOF cat >> mozconfig
 ac_add_options --enable-release
@@ -79,4 +77,4 @@ EOF
 RUN ./mach configure
 RUN ./mach build -j$(nproc)
 RUN ./mach package
-# The target tarball path is obj-riscv64-unknown-linux-gnu/dist/firefox-142.0.en-US.linux-riscv64.tar.zst
+# The target tarball path is obj-riscv64-unknown-linux-gnu/dist/firefox-144.0.en-US.linux-riscv64.tar.zst
